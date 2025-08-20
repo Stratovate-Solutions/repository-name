@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Security Vulnerability Report
+    url: https://github.com/Stratovate-Solutions/.github/security/advisories/new
+    about: Please report security vulnerabilities privately through our security advisory process.
+  - name: 💬 General Discussion
+    url: https://github.com/orgs/Stratovate-Solutions/discussions
+    about: Ask questions, share ideas, or discuss general topics related to our projects.
+  - name: 📚 Documentation
+    url: https://docs.stratovate.com
+    about: Check our documentation for guides, API references, and troubleshooting.
+  - name: 🆘 Support
+    url: https://support.stratovate.com
+    about: Get technical support for our products and services.

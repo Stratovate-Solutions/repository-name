@@ -1,0 +1,504 @@
+# =============================================================================
+# Apply Branch Protection Workflow
+# =============================================================================
+#
+# Purpose: Automated application of standardized branch protection policies
+# Author: Stratovate Solutions DevOps Team
+# Version: 2.0
+# Last Updated: 2025-08-19
+#
+# This reusable workflow applies consistent branch protection rules across
+# repositories to enforce security and quality standards including:
+#
+# Security Features:
+# - Required pull request reviews with configurable approval count
+# - Dismissal of stale reviews when new commits are pushed
+# - Optional code owner review requirements
+# - Administrator enforcement of protection rules
+# - Prevention of force pushes and direct deletions
+# - Required status checks from CI/CD pipelines
+#
+# Quality Assurance:
+# - Ensures all changes go through peer review process
+# - Validates that CI checks pass before merging
+# - Maintains audit trail of all changes
+# - Prevents accidental or malicious direct pushes
+#
+# Customization:
+# - Configurable number of required reviewers (1-6)
+# - Optional code owner approval requirements
+# - Flexible status check requirements
+# - Admin enforcement toggle for emergencies
+# - Organization-specific policy templates
+#
+# Usage Patterns:
+# 1. Organization-wide policy enforcement
+# 2. Individual repository protection setup
+# 3. Temporary policy modifications
+# 4. Compliance and security auditing
+#
+# Prerequisites:
+# - Caller must provide ADMIN_TOKEN secret with repo admin permissions
+# - Target repository must exist and be accessible
+# - Branch must exist (typically 'main', 'master', or 'develop')
+#
+# Security Considerations:
+# - ADMIN_TOKEN should be organization-level with minimal necessary scope
+# - Use fine-grained tokens when possible
+# - Regularly rotate tokens and audit permissions
+# - Monitor usage through GitHub audit logs
+# =============================================================================
+
+name: Apply Branch Protection
+
+# =============================================================================
+# Workflow Interface Definition
+# =============================================================================
+#
+# This workflow is designed to be called by other workflows (workflow_call)
+# and provides a comprehensive interface for configuring branch protection.
+#
+# Input Parameters:
+# - repository: Target repo in 'owner/repo' format
+# - branch: Branch name to protect (default: 'main')
+# - Protection settings: Granular control over all protection features
+# - Status checks: Comma-separated list of required CI checks
+#
+# Secrets Required:
+# - ADMIN_TOKEN: GitHub token with repository administration permissions
+# =============================================================================
+
+on:
+  workflow_call:
+    inputs:
+      # ---------------------------------------------------------------------------
+      # Repository and Branch Configuration
+      # ---------------------------------------------------------------------------
+      
+      repository:
+        description: |
+          Repository name in 'owner/repo' format.
+          Examples: 'Stratovate-Solutions/TeamsSurveyConfig', 'myorg/myrepo'
+        required: true
+        type: string
+        
+      branch:
+        description: |
+          Branch name to protect.
+          Common values: 'main', 'master', 'develop', 'production'
+        required: false
+        default: 'main'
+        type: string
+      
+      # ---------------------------------------------------------------------------
+      # Pull Request Review Requirements
+      # ---------------------------------------------------------------------------
+      
+      require-reviews:
+        description: |
+          Enable pull request review requirements.
+          When true, all changes must be approved via pull request review.
+        required: false
+        default: true
+        type: boolean
+        
+      required-reviewers:
+        description: |
+          Number of required approving reviews (1-6).
+          Higher numbers increase security but may slow development velocity.
+          Recommended: 1-2 for most projects, 2-3 for critical systems.
+        required: false
+        default: 1
+        type: number
+        
+      dismiss-stale-reviews:
+        description: |
+          Automatically dismiss stale reviews when new commits are pushed.
+          Recommended: true (ensures reviews are based on current code)
+        required: false
+        default: true
+        type: boolean
+        
+      require-code-owner-reviews:
+        description: |
+          Require reviews from designated code owners (CODEOWNERS file).
+          Enables domain expert approval for critical changes.
+          Requires CODEOWNERS file in repository root or .github/ directory.
+        required: false
+        default: true
+        type: boolean
+      
+      # ---------------------------------------------------------------------------
+      # Administrative and Security Controls
+      # ---------------------------------------------------------------------------
+      
+      enforce-admins:
+        description: |
+          Apply protection rules to repository administrators.
+          Recommended: true for maximum security
+          Set to false only for emergency access scenarios.
+        required: false
+        default: true
+        type: boolean
+        
+      allow-force-pushes:
+        description: |
+          Allow force pushes to the protected branch.
+          WARNING: Force pushes can rewrite history and bypass reviews.
+          Recommended: false (only enable for specific workflows)
+        required: false
+        default: false
+        type: boolean
+        
+      allow-deletions:
+        description: |
+          Allow deletion of the protected branch.
+          WARNING: Branch deletion can cause data loss.
+          Recommended: false (protect against accidental deletion)
+        required: false
+        default: false
+        type: boolean
+      
+      # ---------------------------------------------------------------------------
+      # Status Check Requirements
+      # ---------------------------------------------------------------------------
+      
+      required-status-checks:
+        description: |
+          Comma-separated list of required status checks.
+          These checks must pass before merging is allowed.
+          
+          Common examples:
+          - 'ci/build,ci/test' (separate build and test jobs)
+          - 'continuous-integration' (single comprehensive job)
+          - 'security-scan,code-quality' (security and quality gates)
+          
+          Leave empty to disable status check requirements.
+          
+          Note: Status check names must exactly match your workflow job names
+          or external service check contexts.
+        required: false
+        default: ''
+        type: string
+        
+      strict-status-checks:
+        description: |
+          Require branches to be up to date before merging.
+          When true, branches must include the latest commits from the target branch.
+          Recommended: true (prevents integration issues)
+        required: false
+        default: true
+        type: boolean
+    
+    # ---------------------------------------------------------------------------
+    # Required Secrets
+    # ---------------------------------------------------------------------------
+    
+    secrets:
+      ADMIN_TOKEN:
+        description: |
+          GitHub Personal Access Token or GitHub App token with repository 
+          administration permissions.
+          
+          Required Permissions:
+          - repo (full repository access)
+          - admin:repo_hook (repository webhooks)
+          
+          Security Best Practices:
+          - Use fine-grained tokens when possible
+          - Limit token scope to specific repositories/organizations
+          - Set appropriate expiration dates
+          - Store in organization or repository secrets
+          - Regularly audit token usage and rotate
+          
+          Token Types:
+          - Classic PAT: ghp_xxxxxxxxxxxxxxxxxxxx
+          - Fine-grained PAT: github_pat_xxxxxxxxxxxxxxxxxxxx
+          - GitHub App: ghs_xxxxxxxxxxxxxxxxxxxx
+        required: true
+
+# =============================================================================
+# Workflow Jobs
+# =============================================================================
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Branch Protection Application Job
+  # ---------------------------------------------------------------------------
+  #
+  # This job applies the specified branch protection configuration using the
+  # GitHub REST API. It includes comprehensive error handling, validation,
+  # and detailed logging for troubleshooting and auditing purposes.
+  # ---------------------------------------------------------------------------
+  
+  apply-protection:
+    name: 🛡️ Apply Branch Protection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5  # Simple API operation should complete quickly
+    
+    # Set minimal required permissions for the job
+    permissions:
+      contents: read
+      actions: read
+    
+    steps:
+      # -------------------------------------------------------------------------
+      # Job Initialization and Validation
+      # -------------------------------------------------------------------------
+      
+      - name: 📋 Protection Configuration Summary
+        run: |
+          echo "::group::Branch Protection Configuration"
+          echo "Repository: ${{ inputs.repository }}"
+          echo "Branch: ${{ inputs.branch }}"
+          echo "Require Reviews: ${{ inputs.require-reviews }}"
+          echo "Required Reviewers: ${{ inputs.required-reviewers }}"
+          echo "Dismiss Stale Reviews: ${{ inputs.dismiss-stale-reviews }}"
+          echo "Require Code Owner Reviews: ${{ inputs.require-code-owner-reviews }}"
+          echo "Enforce Admins: ${{ inputs.enforce-admins }}"
+          echo "Allow Force Pushes: ${{ inputs.allow-force-pushes }}"
+          echo "Allow Deletions: ${{ inputs.allow-deletions }}"
+          echo "Required Status Checks: ${{ inputs.required-status-checks }}"
+          echo "Strict Status Checks: ${{ inputs.strict-status-checks }}"
+          echo "::endgroup::"
+          
+      - name: ✅ Input Validation
+        run: |
+          # Validate repository format
+          if [[ ! "${{ inputs.repository }}" =~ ^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$ ]]; then
+            echo "❌ Invalid repository format: ${{ inputs.repository }}"
+            echo "Expected format: owner/repository"
+            exit 1
+          fi
+          
+          # Validate required reviewers count
+          if [[ ${{ inputs.required-reviewers }} -lt 1 || ${{ inputs.required-reviewers }} -gt 6 ]]; then
+            echo "❌ Invalid required reviewers count: ${{ inputs.required-reviewers }}"
+            echo "Must be between 1 and 6"
+            exit 1
+          fi
+          
+          # Validate branch name
+          if [[ -z "${{ inputs.branch }}" ]]; then
+            echo "❌ Branch name cannot be empty"
+            exit 1
+          fi
+          
+          echo "✅ All input parameters validated successfully"
+      
+      # -------------------------------------------------------------------------
+      # Branch Protection Application
+      # -------------------------------------------------------------------------
+      
+      - name: 🛡️ Apply Branch Protection Policy
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ADMIN_TOKEN }}
+          script: |
+            // ===================================================================
+            // GitHub Branch Protection API Implementation
+            // ===================================================================
+            
+            try {
+              // Parse repository information
+              const [owner, repo] = '${{ inputs.repository }}'.split('/');
+              const branch = '${{ inputs.branch }}';
+              
+              console.log(`🎯 Applying protection to ${owner}/${repo}:${branch}`);
+              
+              // ---------------------------------------------------------------
+              // Parse and Validate Status Checks
+              // ---------------------------------------------------------------
+              
+              const statusChecksInput = '${{ inputs.required-status-checks }}';
+              const statusChecks = statusChecksInput
+                .split(',')
+                .map(check => check.trim())
+                .filter(check => check.length > 0);
+              
+              console.log(`📋 Required status checks: ${statusChecks.length > 0 ? statusChecks.join(', ') : 'None'}`);
+              
+              // ---------------------------------------------------------------
+              // Build Protection Configuration Object
+              // ---------------------------------------------------------------
+              
+              const protectionConfig = {
+                // Required status checks configuration
+                required_status_checks: statusChecks.length > 0 ? {
+                  strict: ${{ inputs.strict-status-checks }},
+                  contexts: statusChecks,
+                  checks: statusChecks.map(check => ({ context: check }))
+                } : null,
+                
+                // Administrator enforcement
+                enforce_admins: ${{ inputs.enforce-admins }},
+                
+                // Pull request review requirements
+                required_pull_request_reviews: ${{ inputs.require-reviews }} ? {
+                  required_approving_review_count: ${{ inputs.required-reviewers }},
+                  dismiss_stale_reviews: ${{ inputs.dismiss-stale-reviews }},
+                  require_code_owner_reviews: ${{ inputs.require-code-owner-reviews }},
+                  restrict_pushes_that_create_pr: false,  // Allow anyone to create PRs
+                  require_last_push_approval: false       // Don't require re-approval for each push
+                } : null,
+                
+                // Access restrictions (null = no restrictions)
+                restrictions: null,
+                
+                // Force push and deletion controls
+                allow_force_pushes: ${{ inputs.allow-force-pushes }},
+                allow_deletions: ${{ inputs.allow-deletions }},
+                
+                // Additional security settings
+                required_linear_history: false,    // Allow merge commits
+                allow_auto_merge: false,          // Disable auto-merge
+                required_conversation_resolution: false  // Don't require resolving all conversations
+              };
+              
+              console.log('🔧 Protection configuration:');
+              console.log(JSON.stringify(protectionConfig, null, 2));
+              
+              // ---------------------------------------------------------------
+              // Apply Branch Protection via GitHub API
+              // ---------------------------------------------------------------
+              
+              console.log(`🚀 Applying protection rules...`);
+              
+              const response = await github.rest.repos.updateBranchProtection({
+                owner: owner,
+                repo: repo,
+                branch: branch,
+                ...protectionConfig
+              });
+              
+              // ---------------------------------------------------------------
+              // Success Handling and Reporting
+              // ---------------------------------------------------------------
+              
+              console.log(`✅ Branch protection applied successfully!`);
+              console.log(`📍 Protection URL: ${response.data.url}`);
+              
+              // Log applied settings for audit trail
+              console.log('\n📊 Applied Protection Settings:');
+              console.log(`   • Required Reviews: ${protectionConfig.required_pull_request_reviews ? 'Yes' : 'No'}`);
+              
+              if (protectionConfig.required_pull_request_reviews) {
+                console.log(`     - Required Approvers: ${protectionConfig.required_pull_request_reviews.required_approving_review_count}`);
+                console.log(`     - Dismiss Stale Reviews: ${protectionConfig.required_pull_request_reviews.dismiss_stale_reviews}`);
+                console.log(`     - Code Owner Reviews: ${protectionConfig.required_pull_request_reviews.require_code_owner_reviews}`);
+              }
+              
+              console.log(`   • Admin Enforcement: ${protectionConfig.enforce_admins ? 'Yes' : 'No'}`);
+              console.log(`   • Force Pushes: ${protectionConfig.allow_force_pushes ? 'Allowed' : 'Blocked'}`);
+              console.log(`   • Branch Deletion: ${protectionConfig.allow_deletions ? 'Allowed' : 'Blocked'}`);
+              
+              if (protectionConfig.required_status_checks) {
+                console.log(`   • Status Checks: ${protectionConfig.required_status_checks.contexts.join(', ')}`);
+                console.log(`   • Strict Checks: ${protectionConfig.required_status_checks.strict ? 'Yes' : 'No'}`);
+              } else {
+                console.log(`   • Status Checks: None required`);
+              }
+              
+              // ---------------------------------------------------------------
+              // GitHub Actions Output
+              // ---------------------------------------------------------------
+              
+              // Set outputs for potential downstream workflows
+              core.setOutput('protection-url', response.data.url);
+              core.setOutput('success', 'true');
+              
+              // Create success annotation
+              core.notice(`✅ Branch protection successfully applied to ${owner}/${repo}:${branch}`, {
+                title: 'Branch Protection Applied',
+                file: 'apply-branch-protection.yml'
+              });
+              
+            } catch (error) {
+              // ---------------------------------------------------------------
+              // Error Handling and Troubleshooting
+              // ---------------------------------------------------------------
+              
+              console.error(`❌ Failed to apply branch protection: ${error.message}`);
+              
+              // Enhanced error diagnostics based on HTTP status codes
+              const status = error.status || error.response?.status;
+              let troubleshooting = '';
+              
+              switch (status) {
+                case 401:
+                  troubleshooting = `
+              🔐 Authentication Error (401):
+                 • Token is invalid or expired
+                 • Token lacks required permissions
+                 • Token is not properly formatted
+              
+              🔧 Solutions:
+                 • Verify ADMIN_TOKEN secret is correctly set
+                 • Ensure token has 'repo' scope and admin permissions
+                 • Check token expiration date
+                 • Generate new token if needed`;
+                  break;
+                  
+                case 403:
+                  troubleshooting = `
+              🚫 Authorization Error (403):
+                 • Token lacks repository admin permissions
+                 • Repository is private and token lacks access
+                 • Organization policy restrictions
+              
+              🔧 Solutions:
+                 • Ensure token has admin access to repository
+                 • Check organization security policies
+                 • Verify repository visibility and access rights`;
+                  break;
+                  
+                case 404:
+                  troubleshooting = `
+              🔍 Not Found Error (404):
+                 • Repository '${owner}/${repo}' doesn't exist
+                 • Branch '${branch}' doesn't exist
+                 • Private repository without access
+              
+              🔧 Solutions:
+                 • Verify repository name spelling
+                 • Ensure branch exists in repository
+                 • Check repository visibility and access`;
+                  break;
+                  
+                case 422:
+                  troubleshooting = `
+              ⚠️ Validation Error (422):
+                 • Invalid protection configuration
+                 • Conflicting protection settings
+                 • Repository doesn't support protection (empty repo)
+              
+              🔧 Solutions:
+                 • Review protection configuration parameters
+                 • Ensure repository has commits and branches
+                 • Check for conflicting settings`;
+                  break;
+                  
+                default:
+                  troubleshooting = `
+              🐛 Unexpected Error (${status || 'Unknown'}):
+                 • GitHub API may be experiencing issues
+                 • Network connectivity problems
+                 • Temporary service disruption
+              
+              🔧 Solutions:
+                 • Check GitHub status page
+                 • Retry the workflow
+                 • Contact GitHub support if issue persists`;
+              }
+              
+              console.error(troubleshooting);
+              
+              // Set failure outputs
+              core.setOutput('success', 'false');
+              core.setOutput('error', error.message);
+              
+              // Create error annotation with troubleshooting info
+              core.setFailed(`Branch protection failed: ${error.message}\n\nTroubleshooting:\n${troubleshooting}`);
+              
+              throw error;
+            }

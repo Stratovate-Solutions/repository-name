@@ -1,0 +1,177 @@
+name: Reusable Release
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.2.3)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as prerelease'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Create as draft'
+        required: false
+        default: false
+        type: boolean
+      generate-notes:
+        description: 'Auto-generate release notes'
+        required: false
+        default: true
+        type: boolean
+      artifacts-path:
+        description: 'Path to build artifacts to upload'
+        required: false
+        default: ''
+        type: string
+      project-type:
+        description: 'Project type for building (node, python, dotnet, powershell)'
+        required: false
+        default: 'auto-detect'
+        type: string
+    secrets:
+      NPM_TOKEN:
+        description: 'NPM token for publishing'
+        required: false
+      NUGET_API_KEY:
+        description: 'NuGet API key for publishing'
+        required: false
+      POWERSHELL_GALLERY_KEY:
+        description: 'PowerShell Gallery API key'
+        required: false
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      upload-url: ${{ steps.create-release.outputs.upload_url }}
+      release-id: ${{ steps.create-release.outputs.id }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Validate tag
+        run: |
+          if [[ ! "${{ inputs.tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
+            echo "❌ Invalid tag format. Expected: v1.2.3 or v1.2.3-alpha.1"
+            exit 1
+          fi
+          echo "✅ Tag format is valid: ${{ inputs.tag }}"
+      
+      - name: Check if tag exists
+        run: |
+          if git rev-parse "${{ inputs.tag }}" >/dev/null 2>&1; then
+            echo "❌ Tag ${{ inputs.tag }} already exists"
+            exit 1
+          fi
+          echo "✅ Tag ${{ inputs.tag }} is available"
+      
+      - name: Create Release
+        id: create-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: release } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: '${{ inputs.tag }}',
+              name: '${{ inputs.tag }}',
+              draft: ${{ inputs.draft }},
+              prerelease: ${{ inputs.prerelease }},
+              generate_release_notes: ${{ inputs.generate-notes }}
+            });
+            
+            console.log(`✅ Release created: ${release.html_url}`);
+            return {
+              upload_url: release.upload_url,
+              id: release.id
+            };
+
+  build-and-publish:
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
+          - os: macos-latest
+            platform: macos
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Detect project type
+        id: detect
+        shell: bash
+        run: |
+          if [ "${{ inputs.project-type }}" != "auto-detect" ]; then
+            echo "project-type=${{ inputs.project-type }}" >> $GITHUB_OUTPUT
+          elif [ -f "package.json" ]; then
+            echo "project-type=node" >> $GITHUB_OUTPUT
+          elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
+            echo "project-type=python" >> $GITHUB_OUTPUT
+          elif [ -f "*.csproj" ] || [ -f "*.sln" ]; then
+            echo "project-type=dotnet" >> $GITHUB_OUTPUT
+          elif [ -f "*.ps1" ] || [ -f "*.psm1" ]; then
+            echo "project-type=powershell" >> $GITHUB_OUTPUT
+          else
+            echo "project-type=generic" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Setup Node.js
+        if: steps.detect.outputs.project-type == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Build Node.js project
+        if: steps.detect.outputs.project-type == 'node'
+        run: |
+          npm ci
+          npm run build
+          npm pack
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      
+      - name: Setup .NET
+        if: steps.detect.outputs.project-type == 'dotnet'
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+      
+      - name: Build .NET project
+        if: steps.detect.outputs.project-type == 'dotnet'
+        run: |
+          dotnet restore
+          dotnet build --configuration Release
+          dotnet pack --configuration Release --output ./packages
+      
+      - name: Setup PowerShell
+        if: steps.detect.outputs.project-type == 'powershell' && matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          Install-Module -Name PowerShellGet -Force -Scope CurrentUser
+      
+      - name: Upload artifacts
+        if: inputs.artifacts-path != ''
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload-url }}
+          asset_path: ${{ inputs.artifacts-path }}
+          asset_name: ${{ matrix.platform }}-artifacts.zip
+          asset_content_type: application/zip

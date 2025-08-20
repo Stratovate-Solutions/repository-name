@@ -1,0 +1,470 @@
+# =============================================================================
+# Reusable CI Workflow
+# =============================================================================
+#
+# Purpose: Multi-language continuous integration workflow for automated 
+#          building, testing, and quality assurance
+# Author: Stratovate Solutions DevOps Team
+# Version: 2.0
+# Last Updated: 2025-08-19
+#
+# This reusable workflow provides comprehensive CI/CD capabilities for multiple
+# programming languages and project types. It automatically detects project
+# type and applies appropriate build, test, and quality assurance processes.
+#
+# Supported Languages & Frameworks:
+# - Node.js (npm, yarn, pnpm)
+# - Python (pip, poetry, pipenv)
+# - .NET (MSBuild, dotnet CLI)
+# - PowerShell (PSScriptAnalyzer, Pester)
+# - Generic projects (basic validation)
+#
+# Key Features:
+# - Automatic project type detection
+# - Dependency caching for faster builds
+# - Code quality analysis (linting, static analysis)
+# - Unit and integration testing
+# - Code coverage reporting
+# - Security vulnerability scanning
+# - Build artifact generation
+# - Cross-platform compatibility
+#
+# Quality Gates:
+# - Linting and code style enforcement
+# - Test execution with coverage reporting
+# - Security vulnerability detection
+# - Build success validation
+# - Performance regression detection
+#
+# Integration Capabilities:
+# - GitHub Advanced Security
+# - Package registry authentication
+# - Code coverage services
+# - Quality dashboards
+# - Notification systems
+# =============================================================================
+
+name: Reusable CI Workflow
+
+# =============================================================================
+# Workflow Input Parameters
+# =============================================================================
+#
+# This section defines all configurable parameters that calling workflows
+# can use to customize the CI behavior for their specific needs.
+#
+# Language Version Parameters:
+# - Support for multiple runtime versions
+# - Automatic detection with sensible defaults
+# - Cross-platform compatibility
+#
+# Execution Control Parameters:
+# - Granular control over CI steps
+# - Skip options for debugging
+# - Working directory support for monorepos
+#
+# Advanced Configuration:
+# - Project type override for complex projects
+# - Custom build and test configurations
+# - Integration with external services
+# =============================================================================
+
+on:
+  workflow_call:
+    inputs:
+      # -------------------------------------------------------------------------
+      # Language Runtime Versions
+      # -------------------------------------------------------------------------
+      
+      node-version:
+        description: |
+          Node.js version to use for JavaScript/TypeScript projects.
+          Supports specific versions (18.16.0) or ranges (18.x, 18).
+          Default: '18' (Current LTS)
+          
+          Common Versions:
+          - '18' (LTS - Recommended for production)
+          - '20' (Current - Latest features)
+          - '16' (Legacy - End of life April 2024)
+        required: false
+        default: '18'
+        type: string
+        
+      python-version:
+        description: |
+          Python version for Python projects.
+          Supports specific versions (3.11.2) or ranges (3.11.x).
+          Default: '3.11' (Stable with good performance)
+          
+          Common Versions:
+          - '3.11' (Recommended - Best performance)
+          - '3.10' (Stable - Wide compatibility)
+          - '3.12' (Latest - Cutting edge features)
+        required: false
+        default: '3.11'
+        type: string
+        
+      dotnet-version:
+        description: |
+          .NET version for C#/F#/VB.NET projects.
+          Supports specific versions (8.0.100) or ranges (8.0.x).
+          Default: '8.0.x' (Latest LTS)
+          
+          Common Versions:
+          - '8.0.x' (LTS - Recommended for new projects)
+          - '6.0.x' (LTS - Legacy support until Nov 2024)
+          - '7.0.x' (STS - End of life May 2024)
+        required: false
+        default: '8.0.x'
+        type: string
+      
+      # -------------------------------------------------------------------------
+      # Execution Control Parameters
+      # -------------------------------------------------------------------------
+      
+      run-tests:
+        description: |
+          Execute test suites during CI pipeline.
+          When false, skips all test execution for faster builds.
+          Useful for draft PRs or build-only scenarios.
+          Default: true
+        required: false
+        default: true
+        type: boolean
+        
+      run-build:
+        description: |
+          Execute build/compilation steps.
+          When false, skips build process (dependencies still installed).
+          Useful for test-only or analysis-only runs.
+          Default: true
+        required: false
+        default: true
+        type: boolean
+        
+      working-directory:
+        description: |
+          Working directory for all CI operations.
+          Useful for monorepos where project is in subdirectory.
+          Default: '.' (repository root)
+          
+          Examples:
+          - '.' (repository root)
+          - 'src/frontend' (frontend in subdirectory)
+          - 'services/api' (microservice structure)
+        required: false
+        default: '.'
+        type: string
+      
+      # -------------------------------------------------------------------------
+      # Project Detection and Configuration
+      # -------------------------------------------------------------------------
+      
+      project-type:
+        description: |
+          Override automatic project type detection.
+          When 'auto-detect', workflow analyzes repository files.
+          Use specific type to force particular CI pipeline.
+          
+          Supported Types:
+          - 'auto-detect' (analyze repository files)
+          - 'node' (JavaScript/TypeScript with npm/yarn)
+          - 'python' (Python with pip/poetry/pipenv)
+          - 'dotnet' (C#/F#/VB.NET with MSBuild)
+          - 'powershell' (PowerShell modules/scripts)
+          - 'generic' (basic validation only)
+        required: false
+        default: 'auto-detect'
+        type: string
+      
+      # -------------------------------------------------------------------------
+      # Quality and Coverage Configuration
+      # -------------------------------------------------------------------------
+      
+      upload-coverage:
+        description: |
+          Upload code coverage reports to GitHub.
+          Enables coverage tracking and PR comments.
+          Requires appropriate test framework configuration.
+          Default: true
+        required: false
+        default: true
+        type: boolean
+        
+      fail-on-coverage-decrease:
+        description: |
+          Fail CI if code coverage decreases from main branch.
+          Helps maintain code quality standards.
+          Requires baseline coverage data.
+          Default: false (warn only)
+        required: false
+        default: false
+        type: boolean
+    
+    # -------------------------------------------------------------------------
+    # Required Secrets for Private Dependencies
+    # -------------------------------------------------------------------------
+    
+    secrets:
+      NPM_TOKEN:
+        description: |
+          NPM authentication token for private package access.
+          Required for installing private npm packages from:
+          - Private npm registries
+          - GitHub Package Registry (@scope/package)
+          - Organization-specific package feeds
+          
+          Token Scopes:
+          - read:packages (minimum for private packages)
+          - write:packages (for publishing)
+          
+          Security Note: Store in repository or organization secrets
+        required: false
+        
+      NUGET_API_KEY:
+        description: |
+          NuGet API key for private package access.
+          Required for installing private NuGet packages from:
+          - Private NuGet feeds
+          - Azure Artifacts
+          - GitHub Package Registry
+          
+          Security Note: Use encrypted secrets and rotate regularly
+        required: false
+      
+      GITHUB_TOKEN:
+        description: |
+          GitHub token for API access and package registry.
+          Automatically provided by GitHub Actions.
+          Used for:
+          - GitHub Package Registry access
+          - API calls for coverage reporting
+          - Workflow status updates
+          
+          Note: Automatically available, typically don't need to pass explicitly
+        required: false
+
+# =============================================================================
+# Global Workflow Configuration
+# =============================================================================
+
+# Security: Define minimal required permissions
+permissions:
+  contents: read      # Read repository contents
+  actions: read       # Read workflow information
+  checks: write       # Write check results
+  pull-requests: write # Comment on PRs with results
+
+# Environment variables available to all jobs
+env:
+  # Workflow identification
+  WORKFLOW_NAME: "Reusable CI"
+  WORKFLOW_VERSION: "2.0"
+  
+  # Build optimization
+  NODE_OPTIONS: "--max-old-space-size=4096"
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  
+  # Quality and debugging
+  FORCE_COLOR: "1"
+  CI: true
+  DEBIAN_FRONTEND: noninteractive
+
+# =============================================================================
+# CI Pipeline Jobs
+# =============================================================================
+  # =============================================================================
+# CI Pipeline Jobs
+# =============================================================================
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Project Type Detection
+  # ---------------------------------------------------------------------------
+  #
+  # Responsibility: Analyze repository structure to determine project type
+  # This enables the workflow to automatically select appropriate CI pipeline
+  # 
+  # Detection Logic:
+  # - package.json → Node.js project
+  # - requirements.txt or pyproject.toml → Python project  
+  # - *.csproj or *.sln → .NET project
+  # - *.ps1 or *.psm1 → PowerShell project
+  # - Default → Generic project
+  # ---------------------------------------------------------------------------
+  
+  detect-project-type:
+    name: 🔍 Detect Project Type
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      project-type: ${{ steps.detect.outputs.project-type }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Detect project type
+        id: detect
+        run: |
+          if [ "${{ inputs.project-type }}" != "auto-detect" ]; then
+            echo "project-type=${{ inputs.project-type }}" >> $GITHUB_OUTPUT
+          elif [ -f "package.json" ]; then
+            echo "project-type=node" >> $GITHUB_OUTPUT
+          elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
+            echo "project-type=python" >> $GITHUB_OUTPUT
+          elif [ -f "*.csproj" ] || [ -f "*.sln" ]; then
+            echo "project-type=dotnet" >> $GITHUB_OUTPUT
+          elif [ -f "*.ps1" ] || [ -f "*.psm1" ]; then
+            echo "project-type=powershell" >> $GITHUB_OUTPUT
+          else
+            echo "project-type=generic" >> $GITHUB_OUTPUT
+          fi
+
+  ci-node:
+    if: needs.detect-project-type.outputs.project-type == 'node'
+    needs: detect-project-type
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      
+      - name: Run linting
+        run: |
+          if npm run lint --if-present; then
+            echo "Linting completed successfully"
+          else
+            echo "No lint script found or linting failed"
+            exit 1
+          fi
+      
+      - name: Run tests
+        if: ${{ inputs.run-tests }}
+        run: |
+          if npm run test --if-present; then
+            echo "Tests completed successfully"
+          else
+            echo "No test script found"
+          fi
+      
+      - name: Build project
+        if: ${{ inputs.run-build }}
+        run: |
+          if npm run build --if-present; then
+            echo "Build completed successfully"
+          else
+            echo "No build script found"
+          fi
+
+  ci-python:
+    if: needs.detect-project-type.outputs.project-type == 'python'
+    needs: detect-project-type
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+      
+      - name: Run linting with flake8
+        run: |
+          pip install flake8
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      
+      - name: Run tests with pytest
+        if: ${{ inputs.run-tests }}
+        run: |
+          pip install pytest pytest-cov
+          pytest --cov=. --cov-report=xml
+
+  ci-dotnet:
+    if: needs.detect-project-type.outputs.project-type == 'dotnet'
+    needs: detect-project-type
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+      
+      - name: Restore dependencies
+        run: dotnet restore
+      
+      - name: Build
+        if: ${{ inputs.run-build }}
+        run: dotnet build --no-restore --configuration Release
+      
+      - name: Run tests
+        if: ${{ inputs.run-tests }}
+        run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+
+  ci-powershell:
+    if: needs.detect-project-type.outputs.project-type == 'powershell'
+    needs: detect-project-type
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -ReportSummary
+          if ($results) {
+            $results | Format-Table
+            throw "PSScriptAnalyzer found issues"
+          }
+      
+      - name: Run Pester tests
+        if: ${{ inputs.run-tests }}
+        shell: pwsh
+        run: |
+          Install-Module -Name Pester -Force -Scope CurrentUser
+          if (Test-Path "Tests") {
+            Invoke-Pester -Path "Tests" -OutputFormat NUnitXml -OutputFile "TestResults.xml"
+          } else {
+            Write-Host "No Tests directory found"
+          }

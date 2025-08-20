@@ -1,0 +1,246 @@
+{
+  "name": "github-branch-protection-policy",
+  "version": "2.0.0",
+  "description": "Automated enforcement of standardized branch protection policies across GitHub repositories",
+  "main": "BranchProtectionPolicy.ps1",
+  "scripts": {
+    "test": "Invoke-Pester -Path './tests/' -OutputFormat NUnitXml -OutputFile 'TestResults.xml'",
+    "lint": "Invoke-ScriptAnalyzer -Path './' -Recurse -ReportSummary",
+    "security-scan": "Invoke-ScriptAnalyzer -Path './' -Recurse -Severity Warning,Error",
+    "docs": "Get-Help .\\BranchProtectionPolicy.ps1 -Full | Out-File -FilePath 'docs\\help.txt'",
+    "clean": "Remove-Item -Path 'logs\\*' -Force -ErrorAction SilentlyContinue"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Stratovate-Solutions/BranchProtectionPolicy.git"
+  },
+  "keywords": [
+    "github",
+    "branch-protection", 
+    "security",
+    "devops",
+    "automation",
+    "powershell",
+    "compliance",
+    "repository-management",
+    "ci-cd",
+    "github-api"
+  ],
+  "author": {
+    "name": "Stratovate Solutions DevOps Team",
+    "email": "devops@stratovate.com",
+    "url": "https://stratovate.com"
+  },
+  "contributors": [
+    {
+      "name": "Jeffrey LeBlanc",
+      "email": "jeffrey.leblanc@stratovate.com",
+      "role": "Lead Developer"
+    }
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Stratovate-Solutions/BranchProtectionPolicy/issues",
+    "email": "devops@stratovate.com"
+  },
+  "homepage": "https://github.com/Stratovate-Solutions/BranchProtectionPolicy#readme",
+  "documentation": {
+    "readme": "README.md",
+    "changelog": "CHANGELOG.md",
+    "examples": "docs/examples.md",
+    "api": "docs/api.md",
+    "troubleshooting": "docs/troubleshooting.md"
+  },
+  "engines": {
+    "powershell": ">=7.0.0"
+  },
+  "os": [
+    "win32",
+    "linux",
+    "darwin"
+  ],
+  "categories": [
+    "DevOps",
+    "Security",
+    "Automation",
+    "GitHub"
+  ],
+  "tags": [
+    "branch-protection",
+    "github-api",
+    "security-automation",
+    "devops-tools",
+    "repository-management"
+  ],
+  "dependencies": {
+    "powershell": ">=7.0.0",
+    "github-api": "2022-11-28"
+  },
+  "devDependencies": {
+    "pester": ">=5.0.0",
+    "psscriptanalyzer": ">=1.20.0"
+  },
+  "config": {
+    "defaultBranch": "main",
+    "apiVersion": "2022-11-28",
+    "userAgent": "Stratovate-BranchProtectionScript/2.0",
+    "retryAttempts": 3,
+    "retryDelay": 1000
+  },
+  "features": [
+    "Batch branch protection application",
+    "Secure credential management",
+    "Comprehensive error handling",
+    "Audit logging and reporting",
+    "GitHub Actions integration",
+    "Customizable protection policies",
+    "Multi-repository support",
+    "Status check requirements",
+    "Code owner review enforcement",
+    "Administrator protection"
+  ],
+  "requirements": {
+    "powershell": {
+      "version": ">=7.0.0",
+      "modules": []
+    },
+    "github": {
+      "permissions": [
+        "repo",
+        "admin:repo_hook"
+      ],
+      "tokenType": "personal-access-token or github-app"
+    },
+    "network": {
+      "outbound": "https://api.github.com"
+    }
+  },
+  "security": {
+    "tokenHandling": "secure-storage-recommended",
+    "auditLogging": "enabled",
+    "minimumPermissions": "repo-admin",
+    "encryptionAtRest": "supported"
+  },
+  "compliance": {
+    "standards": [
+      "SOC2",
+      "ISO27001",
+      "PCI-DSS"
+    ],
+    "frameworks": [
+      "NIST",
+      "CIS-Controls"
+    ]
+  },
+  "testing": {
+    "framework": "Pester",
+    "coverage": {
+      "minimum": 80,
+      "target": 90
+    },
+    "types": [
+      "unit",
+      "integration",
+      "security"
+    ]
+  },
+  "ci": {
+    "platforms": [
+      "GitHub Actions",
+      "Azure DevOps",
+      "Jenkins"
+    ],
+    "workflows": [
+      "continuous-integration",
+      "security-scanning",
+      "compliance-checking"
+    ]
+  },
+  "deployment": {
+    "methods": [
+      "manual-execution",
+      "github-actions",
+      "scheduled-automation"
+    ],
+    "environments": [
+      "development",
+      "staging", 
+      "production"
+    ]
+  },
+  "monitoring": {
+    "logging": {
+      "levels": ["Info", "Warning", "Error", "Success"],
+      "outputs": ["console", "file", "csv"]
+    },
+    "metrics": [
+      "success-rate",
+      "failure-rate",
+      "execution-time",
+      "repositories-processed"
+    ],
+    "alerts": [
+      "protection-failures",
+      "token-expiration",
+      "api-rate-limits"
+    ]
+  },
+  "integrations": {
+    "github": {
+      "api": "REST API v4",
+      "webhooks": "supported",
+      "apps": "compatible"
+    },
+    "slack": {
+      "notifications": "supported",
+      "webhooks": "incoming-webhooks"
+    },
+    "teams": {
+      "notifications": "supported",
+      "webhooks": "incoming-webhooks"
+    },
+    "azure": {
+      "keyvault": "supported",
+      "devops": "pipeline-integration"
+    }
+  },
+  "support": {
+    "channels": [
+      "github-issues",
+      "email",
+      "documentation"
+    ],
+    "sla": {
+      "response-time": "2-business-days",
+      "resolution-time": "5-business-days"
+    },
+    "community": {
+      "discussions": "github-discussions",
+      "wiki": "github-wiki"
+    }
+  },
+  "roadmap": {
+    "v2.1": [
+      "github-app-authentication",
+      "policy-templates",
+      "compliance-reporting"
+    ],
+    "v2.2": [
+      "terraform-provider",
+      "azure-repos-support",
+      "webhook-automation"
+    ],
+    "v3.0": [
+      "multi-platform-support",
+      "api-gateway",
+      "enterprise-features"
+    ]
+  },
+  "metadata": {
+    "created": "2024-06-01",
+    "lastUpdated": "2025-08-19",
+    "maintainer": "Stratovate Solutions DevOps Team",
+    "status": "active",
+    "stability": "stable"
+  }
+}

@@ -1,0 +1,15 @@
+{
+    "name": "Continuous Integration Workflow",
+    "description": "A comprehensive CI workflow with testing, linting, and security scanning.",
+    "iconName": "github",
+    "categories": [
+        "CI",
+        "JavaScript",
+        "TypeScript"
+    ],
+    "filePatterns": [
+        "package.json",
+        "*.js",
+        "*.ts"
+    ]
+}
