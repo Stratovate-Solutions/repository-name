@@ -232,7 +232,7 @@ jobs:
   # ---------------------------------------------------------------------------
 
   apply-protection:
-    name: 🛡️ Apply Branch Protection
+    name: Apply Branch Protection
     runs-on: ubuntu-latest
     timeout-minutes: 5  # Simple API operation should complete quickly
 
@@ -246,7 +246,7 @@ jobs:
       # Job Initialization and Validation
       # -------------------------------------------------------------------------
 
-      - name: 📋 Protection Configuration Summary
+      - name: Protection Configuration Summary
         run: |
           echo "::group::Branch Protection Configuration"
           echo "Repository: ${{ inputs.repository }}"
@@ -262,35 +262,35 @@ jobs:
           echo "Strict Status Checks: ${{ inputs.strict-status-checks }}"
           echo "::endgroup::"
 
-      - name: ✅ Input Validation
+      - name: Input Validation
         run: |
           # Validate repository format
           if [[ ! "${{ inputs.repository }}" =~ ^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$ ]]; then
-            echo "❌ Invalid repository format: ${{ inputs.repository }}"
+            echo "[ERROR] Invalid repository format: ${{ inputs.repository }}"
             echo "Expected format: owner/repository"
             exit 1
           fi
 
           # Validate required reviewers count
           if [[ ${{ inputs.required-reviewers }} -lt 1 || ${{ inputs.required-reviewers }} -gt 6 ]]; then
-            echo "❌ Invalid required reviewers count: ${{ inputs.required-reviewers }}"
+            echo "[ERROR] Invalid required reviewers count: ${{ inputs.required-reviewers }}"
             echo "Must be between 1 and 6"
             exit 1
           fi
 
           # Validate branch name
           if [[ -z "${{ inputs.branch }}" ]]; then
-            echo "❌ Branch name cannot be empty"
+            echo "[ERROR] Branch name cannot be empty"
             exit 1
           fi
 
-          echo "✅ All input parameters validated successfully"
+          echo "[OK] All input parameters validated successfully"
 
       # -------------------------------------------------------------------------
       # Branch Protection Application
       # -------------------------------------------------------------------------
 
-      - name: 🛡️ Apply Branch Protection Policy
+      - name: Apply Branch Protection Policy
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ADMIN_TOKEN }}
@@ -304,7 +304,7 @@ jobs:
               const [owner, repo] = '${{ inputs.repository }}'.split('/');
               const branch = '${{ inputs.branch }}';
 
-              console.log(`🎯 Applying protection to ${owner}/${repo}:${branch}`);
+              console.log(`[TARGET] Applying protection to ${owner}/${repo}:${branch}`);
 
               // ---------------------------------------------------------------
               // Parse and Validate Status Checks
@@ -316,7 +316,7 @@ jobs:
                 .map(check => check.trim())
                 .filter(check => check.length > 0);
 
-              console.log(`📋 Required status checks: ${statusChecks.length > 0 ? statusChecks.join(', ') : 'None'}`);
+              console.log(`[Clipboard] Required status checks: ${statusChecks.length > 0 ? statusChecks.join(', ') : 'None'}`);
 
               // ---------------------------------------------------------------
               // Build Protection Configuration Object
@@ -362,14 +362,14 @@ jobs:
                 allow_fork_syncing: true
               };
 
-              console.log('🔧 Protection configuration:');
+              console.log('[CONFIG] Protection configuration:');
               console.log(JSON.stringify(protectionConfig, null, 2));
 
               // ---------------------------------------------------------------
               // Apply Branch Protection via GitHub API
               // ---------------------------------------------------------------
 
-              console.log(`🚀 Applying protection rules...`);
+              console.log(`[DEPLOY] Applying protection rules...`);
 
               const response = await github.rest.repos.updateBranchProtection({
                 owner: owner,
@@ -382,12 +382,12 @@ jobs:
               // Success Handling and Reporting
               // ---------------------------------------------------------------
 
-              console.log(`✅ Branch protection applied successfully!`);
-              console.log(`📍 Protection URL: ${response.data.url}`);
+              console.log(`[OK] Branch protection applied successfully!`);
+              console.log(`[PIN] Protection URL: ${response.data.url}`);
 
               // Log applied settings for audit trail
-              console.log('\n📊 Applied Protection Settings:');
-              console.log(`   • Required Reviews: ${protectionConfig.required_pull_request_reviews ? 'Yes' : 'No'}`);
+              console.log('\n Applied Protection Settings:');
+              console.log(`   * Required Reviews: ${protectionConfig.required_pull_request_reviews ? 'Yes' : 'No'}`);
 
               if (protectionConfig.required_pull_request_reviews) {
                 const reviewCount = protectionConfig.required_pull_request_reviews.required_approving_review_count;
@@ -398,15 +398,15 @@ jobs:
                 console.log(`     - Code Owner Reviews: ${codeOwnerReviews}`);
               }
 
-              console.log(`   • Admin Enforcement: ${protectionConfig.enforce_admins ? 'Yes' : 'No'}`);
-              console.log(`   • Force Pushes: ${protectionConfig.allow_force_pushes ? 'Allowed' : 'Blocked'}`);
-              console.log(`   • Branch Deletion: ${protectionConfig.allow_deletions ? 'Allowed' : 'Blocked'}`);
+              console.log(`   * Admin Enforcement: ${protectionConfig.enforce_admins ? 'Yes' : 'No'}`);
+              console.log(`   * Force Pushes: ${protectionConfig.allow_force_pushes ? 'Allowed' : 'Blocked'}`);
+              console.log(`   * Branch Deletion: ${protectionConfig.allow_deletions ? 'Allowed' : 'Blocked'}`);
 
               if (protectionConfig.required_status_checks) {
-                console.log(`   • Status Checks: ${protectionConfig.required_status_checks.contexts.join(', ')}`);
-                console.log(`   • Strict Checks: ${protectionConfig.required_status_checks.strict ? 'Yes' : 'No'}`);
+                console.log(`   * Status Checks: ${protectionConfig.required_status_checks.contexts.join(', ')}`);
+                console.log(`   * Strict Checks: ${protectionConfig.required_status_checks.strict ? 'Yes' : 'No'}`);
               } else {
-                console.log(`   • Status Checks: None required`);
+                console.log(`   * Status Checks: None required`);
               }
 
               // ---------------------------------------------------------------
@@ -418,7 +418,7 @@ jobs:
               core.setOutput('success', 'true');
 
               // Create success annotation
-              core.notice(`✅ Branch protection successfully applied to ${owner}/${repo}:${branch}`, {
+              core.notice(`[OK] Branch protection successfully applied to ${owner}/${repo}:${branch}`, {
                 title: 'Branch Protection Applied',
                 file: 'apply-branch-protection.yml'
               });
@@ -428,7 +428,7 @@ jobs:
               // Error Handling and Troubleshooting
               // ---------------------------------------------------------------
 
-              console.error(`❌ Failed to apply branch protection: ${error.message}`);
+              console.error(`[ERROR] Failed to apply branch protection: ${error.message}`);
 
               // Enhanced error diagnostics based on HTTP status codes
               const status = error.status || error.response?.status;
@@ -437,68 +437,68 @@ jobs:
               switch (status) {
                 case 401:
                   troubleshooting = `
-              🔐 Authentication Error (401):
-                 • Token is invalid or expired
-                 • Token lacks required permissions
-                 • Token is not properly formatted
+              [Lock] Authentication Error (401):
+                 * Token is invalid or expired
+                 * Token lacks required permissions
+                 * Token is not properly formatted
 
-              🔧 Solutions:
-                 • Verify ADMIN_TOKEN secret is correctly set
-                 • Ensure token has 'repo' scope and admin permissions
-                 • Check token expiration date
-                 • Generate new token if needed`;
+              [CONFIG] Solutions:
+                 * Verify ADMIN_TOKEN secret is correctly set
+                 * Ensure token has 'repo' scope and admin permissions
+                 * Check token expiration date
+                 * Generate new token if needed`;
                   break;
 
                 case 403:
                   troubleshooting = `
-              🚫 Authorization Error (403):
-                 • Token lacks repository admin permissions
-                 • Repository is private and token lacks access
-                 • Organization policy restrictions
+              [BLOCKED] Authorization Error (403):
+                 * Token lacks repository admin permissions
+                 * Repository is private and token lacks access
+                 * Organization policy restrictions
 
-              🔧 Solutions:
-                 • Ensure token has admin access to repository
-                 • Check organization security policies
-                 • Verify repository visibility and access rights`;
+              [CONFIG] Solutions:
+                 * Ensure token has admin access to repository
+                 * Check organization security policies
+                 * Verify repository visibility and access rights`;
                   break;
 
                 case 404:
                   troubleshooting = `
-              🔍 Not Found Error (404):
-                 • Repository '${owner}/${repo}' doesn't exist
-                 • Branch '${branch}' doesn't exist
-                 • Private repository without access
+              [Search] Not Found Error (404):
+                 * Repository '${owner}/${repo}' doesn't exist
+                 * Branch '${branch}' doesn't exist
+                 * Private repository without access
 
-              🔧 Solutions:
-                 • Verify repository name spelling
-                 • Ensure branch exists in repository
-                 • Check repository visibility and access`;
+              [CONFIG] Solutions:
+                 * Verify repository name spelling
+                 * Ensure branch exists in repository
+                 * Check repository visibility and access`;
                   break;
 
                 case 422:
                   troubleshooting = `
-              ⚠️ Validation Error (422):
-                 • Invalid protection configuration
-                 • Conflicting protection settings
-                 • Repository doesn't support protection (empty repo)
+              [Warning] Validation Error (422):
+                 * Invalid protection configuration
+                 * Conflicting protection settings
+                 * Repository doesn't support protection (empty repo)
 
-              🔧 Solutions:
-                 • Review protection configuration parameters
-                 • Ensure repository has commits and branches
-                 • Check for conflicting settings`;
+              [CONFIG] Solutions:
+                 * Review protection configuration parameters
+                 * Ensure repository has commits and branches
+                 * Check for conflicting settings`;
                   break;
 
                 default:
                   troubleshooting = `
-              🐛 Unexpected Error (${status || 'Unknown'}):
-                 • GitHub API may be experiencing issues
-                 • Network connectivity problems
-                 • Temporary service disruption
+              [BUG] Unexpected Error (${status || 'Unknown'}):
+                 * GitHub API may be experiencing issues
+                 * Network connectivity problems
+                 * Temporary service disruption
 
-              🔧 Solutions:
-                 • Check GitHub status page
-                 • Retry the workflow
-                 • Contact GitHub support if issue persists`;
+              [CONFIG] Solutions:
+                 * Check GitHub status page
+                 * Retry the workflow
+                 * Contact GitHub support if issue persists`;
               }
 
               console.error(troubleshooting);

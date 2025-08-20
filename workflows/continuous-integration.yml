@@ -134,7 +134,7 @@ jobs:
   # ---------------------------------------------------------------------------
 
   ci:
-    name: 🔍 Build & Test
+    name: Build & Test
     # Skip CI on draft PRs (optional optimization)
     if: github.event.pull_request.draft != true
     # Use our centralized reusable CI workflow
@@ -184,7 +184,7 @@ jobs:
   # ---------------------------------------------------------------------------
 
   security:
-    name: 🛡️ Security Scan
+    name: Security Scan
     # Run security scans in parallel with CI for faster feedback
     # Also run on schedule for periodic security checks
     if: github.event.pull_request.draft != true
@@ -220,13 +220,13 @@ jobs:
   # ---------------------------------------------------------------------------
 
   build-summary:
-    name: 📋 Build Summary
+    name: Build Summary
     runs-on: ubuntu-latest
     needs: [ci, security]
     if: always()  # Run even if previous jobs fail
 
     steps:
-      - name: 📊 Pipeline Summary
+      - name: Pipeline Summary
         run: |
           echo "::group::Pipeline Results"
           echo "CI Status: ${{ needs.ci.result }}"
@@ -234,19 +234,19 @@ jobs:
 
           # Determine overall status
           if [[ "${{ needs.ci.result }}" == "success" && "${{ needs.security.result }}" == "success" ]]; then
-            echo "✅ Pipeline Status: SUCCESS"
+            echo "[OK] Pipeline Status: SUCCESS"
             echo "All checks passed! Ready for review/merge."
           elif [[ "${{ needs.ci.result }}" == "failure" || "${{ needs.security.result }}" == "failure" ]]; then
-            echo "❌ Pipeline Status: FAILURE"
+            echo "[ERROR] Pipeline Status: FAILURE"
             echo "One or more checks failed. Please review the logs."
             exit 1
           else
-            echo "⚠️ Pipeline Status: PARTIAL"
+            echo "[Warning] Pipeline Status: PARTIAL"
             echo "Some checks were skipped or cancelled."
           fi
           echo "::endgroup::"
 
-      - name: 💬 PR Comment (on failure)
+      - name: PR Comment (on failure)
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
@@ -255,7 +255,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## 🚨 CI Pipeline Failed
+              body: `## [Alert] CI Pipeline Failed
 
               The continuous integration pipeline has failed. Please check the following:
 

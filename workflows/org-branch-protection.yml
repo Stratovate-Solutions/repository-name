@@ -56,7 +56,7 @@ jobs:
   # ---------------------------------------------------------------------------
 
   discover-repositories:
-    name: 🔍 Discover Repositories
+    name: Discover Repositories
     runs-on: ubuntu-latest
     outputs:
       repositories: ${{ steps.filter.outputs.repositories }}
@@ -70,7 +70,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const org = process.env.ORGANIZATION;
-            console.log(`🔍 Discovering repositories in ${org}...`);
+            console.log(`[Search] Discovering repositories in ${org}...`);
 
             try {
               const repos = await github.paginate(github.rest.repos.listForOrg, {
@@ -80,11 +80,11 @@ jobs:
                 per_page: 100
               });
 
-              console.log(`📋 Found ${repos.length} total repositories`);
+              console.log(`[Clipboard] Found ${repos.length} total repositories`);
               return repos;
 
             } catch (error) {
-              console.error(`❌ Failed to fetch repositories: ${error.message}`);
+              console.error(`[ERROR] Failed to fetch repositories: ${error.message}`);
               throw error;
             }
 
@@ -98,19 +98,19 @@ jobs:
             const targetBranch = '${{ inputs.target-branch }}';
             const eligibleRepos = [];
 
-            console.log(`🔍 Filtering repositories for branch protection...`);
-            console.log(`🎯 Target branch: ${targetBranch}`);
+            console.log(`[Search] Filtering repositories for branch protection...`);
+            console.log(`[Dart] Target branch: ${targetBranch}`);
 
             for (const repo of allRepos) {
               // Skip archived repositories
               if (repo.archived) {
-                console.log(`⏭️ Skipping archived: ${repo.full_name}`);
+                console.log(`? Skipping archived: ${repo.full_name}`);
                 continue;
               }
 
               // Skip forks unless they're actively maintained
               if (repo.fork && !repo.pushed_at > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) {
-                console.log(`⏭️ Skipping inactive fork: ${repo.full_name}`);
+                console.log(`? Skipping inactive fork: ${repo.full_name}`);
                 continue;
               }
 
@@ -130,20 +130,20 @@ jobs:
                   updated_at: repo.updated_at
                 });
 
-                console.log(`✅ Eligible: ${repo.full_name} (${targetBranch} exists)`);
+                console.log(`[OK] Eligible: ${repo.full_name} (${targetBranch} exists)`);
 
               } catch (error) {
                 if (error.status === 404) {
-                  console.log(`⏭️ Skipping ${repo.full_name}: ${targetBranch} branch not found`);
+                  console.log(`? Skipping ${repo.full_name}: ${targetBranch} branch not found`);
                 } else {
-                  console.log(`⚠️ Error checking ${repo.full_name}: ${error.message}`);
+                  console.log(`[Warning] Error checking ${repo.full_name}: ${error.message}`);
                 }
               }
             }
 
-            console.log(`\n📊 Summary:`);
-            console.log(`   • Total repositories: ${allRepos.length}`);
-            console.log(`   • Eligible for protection: ${eligibleRepos.length}`);
+            console.log(`\n Summary:`);
+            console.log(`   * Total repositories: ${allRepos.length}`);
+            console.log(`   * Eligible for protection: ${eligibleRepos.length}`);
 
             core.setOutput('repositories', JSON.stringify(eligibleRepos));
             core.setOutput('total_count', eligibleRepos.length);
@@ -155,7 +155,7 @@ jobs:
   # ---------------------------------------------------------------------------
 
   apply-protection:
-    name: 🛡️ Protect Repository
+    name: Protect Repository
     needs: discover-repositories
     if: ${{ needs.discover-repositories.outputs.total_count > 0 }}
     runs-on: ubuntu-latest
@@ -167,7 +167,7 @@ jobs:
         repository: ${{ fromJSON(needs.discover-repositories.outputs.repositories) }}
 
     steps:
-      - name: 📋 Repository Information
+      - name: Repository Information
         run: |
           echo "::group::Repository Details"
           echo "Repository: ${{ matrix.repository.name }}"
@@ -178,7 +178,7 @@ jobs:
           echo "Last Updated: ${{ matrix.repository.updated_at }}"
           echo "::endgroup::"
 
-      - name: 🛡️ Apply Branch Protection
+      - name: Apply Branch Protection
         if: ${{ !inputs.dry-run }}
         uses: actions/github-script@v7
         with:
@@ -190,7 +190,7 @@ jobs:
             const requiredReviewers = parseInt('${{ inputs.required-reviewers }}');
             const enforceAdmins = '${{ inputs.enforce-admins }}' === 'true';
 
-            console.log(`🛡️ Applying branch protection to ${owner}/${repo}:${branch}`);
+            console.log(`[Shield] Applying branch protection to ${owner}/${repo}:${branch}`);
 
             try {
               await github.rest.repos.updateBranchProtection({
@@ -212,37 +212,37 @@ jobs:
                 allow_deletions: false
               });
 
-              console.log(`✅ Successfully applied protection to ${repo}:${branch}`);
+              console.log(`[OK] Successfully applied protection to ${repo}:${branch}`);
 
             } catch (error) {
-              console.error(`❌ Failed to apply protection: ${error.message}`);
+              console.error(`[ERROR] Failed to apply protection: ${error.message}`);
               throw error;
             }
 
-      - name: 🔍 Dry Run Preview
+      - name: Dry Run Preview
         if: ${{ inputs.dry-run }}
         run: |
           echo "::notice title=Dry Run::Would apply protection to" \
                "${{ matrix.repository.name }}:${{ inputs.target-branch }}"
           echo "Settings that would be applied:"
-          echo "  • Required reviewers: ${{ inputs.required-reviewers }}"
-          echo "  • Enforce for admins: ${{ inputs.enforce-admins }}"
-          echo "  • Required status checks: Organization Protection Policy CI"
-          echo "  • Force pushes: Blocked"
-          echo "  • Branch deletion: Blocked"
+          echo "  * Required reviewers: ${{ inputs.required-reviewers }}"
+          echo "  * Enforce for admins: ${{ inputs.enforce-admins }}"
+          echo "  * Required status checks: Organization Protection Policy CI"
+          echo "  * Force pushes: Blocked"
+          echo "  * Branch deletion: Blocked"
 
   # ---------------------------------------------------------------------------
   # Results Summary and Reporting
   # ---------------------------------------------------------------------------
 
   summarize-results:
-    name: 📊 Summarize Results
+    name: Summarize Results
     needs: [discover-repositories, apply-protection]
     if: always()
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📊 Generate Summary Report
+      - name: Generate Summary Report
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -251,7 +251,7 @@ jobs:
             const isDryRun = '${{ inputs.dry-run }}' === 'true';
             const targetBranch = '${{ inputs.target-branch }}';
 
-            console.log(`\n🎯 Organization Branch Protection Summary`);
+            console.log(`\n[Dart] Organization Branch Protection Summary`);
             console.log(`=====================================`);
             console.log(`Organization: ${process.env.ORGANIZATION}`);
             console.log(`Target Branch: ${targetBranch}`);
@@ -259,11 +259,11 @@ jobs:
             console.log(`Total Eligible Repositories: ${totalRepos}`);
 
             if (isDryRun) {
-              console.log(`\n✅ Dry run completed successfully`);
+              console.log(`\n[OK] Dry run completed successfully`);
               console.log(`No changes were made to repositories`);
               console.log(`Review the individual job outputs above for details`);
             } else {
-              console.log(`\n✅ Branch protection application completed`);
+              console.log(`\n[OK] Branch protection application completed`);
               console.log(`Check individual repository results above for any failures`);
             }
 
@@ -273,17 +273,17 @@ jobs:
 
             **Organization:** ${process.env.ORGANIZATION}
             **Target Branch:** \`${targetBranch}\`
-            **Mode:** ${isDryRun ? '🔍 Dry Run (Preview)' : '🛡️ Live Application'}
+            **Mode:** ${isDryRun ? '[Search] Dry Run (Preview)' : '[Shield] Live Application'}
             **Repositories Processed:** ${totalRepos}
 
             ## Applied Settings
             - **Required Reviewers:** ${{ inputs.required-reviewers }}
             - **Enforce for Admins:** ${{ inputs.enforce-admins }}
             - **Status Checks:** \`Organization Protection Policy CI\`
-            - **Force Pushes:** ❌ Blocked
-            - **Branch Deletion:** ❌ Blocked
+            - **Force Pushes:** [ERROR] Blocked
+            - **Branch Deletion:** [ERROR] Blocked
 
-            ${isDryRun ? '> 💡 This was a dry run. No actual changes were made.' : ''}
+            ${isDryRun ? '> [Bulb] This was a dry run. No actual changes were made.' : ''}
             `;
 
             await core.summary
