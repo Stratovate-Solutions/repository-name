@@ -13,7 +13,7 @@ $templateErrors = 0
 
 foreach ($field in $requiredFields) {
     $fieldValue = $content.$field
-    $exists = $fieldValue -ne $null -and $fieldValue -ne ""
+    $exists = $null -ne $fieldValue -and $fieldValue -ne ""
     Write-Host "$field : exists = $exists, value = '$fieldValue'"
     
     if (-not $content.$field) {

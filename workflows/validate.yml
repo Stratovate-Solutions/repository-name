@@ -1,12 +1,168 @@
-# .github/workflows/validate.yml
+# =============================================================================
+# Repository and GitHub Configuration Validation
+# =============================================================================
+#
+# Purpose: Validate GitHub configuration and repository structure
+# Author: Stratovate Solutions DevOps Team
+# Version: 2.0
+# Last Updated: 2025-08-20
+# =============================================================================
+
 name: Validate GitHub Config
-on: [push, pull_request]
+
+on: 
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+
 jobs:
-  validate:
+  validate-config:
+    name: 🔧 GitHub Config Validation
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Validate workflows
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python for yamllint
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install yamllint
+        run: pip install yamllint
+
+      - name: 🔍 Validate YAML workflows
         run: |
-          find .github/workflows -name "*.yml" -o -name "*.yaml" | \
-          xargs -I {} yamllint {}
+          echo "=== YAML Workflow Validation ==="
+          
+          # Find all workflow files
+          workflow_files=$(find .github/workflows -name "*.yml" -o -name "*.yaml" 2>/dev/null || true)
+          
+          if [ -z "$workflow_files" ]; then
+            echo "⚠️ No workflow files found in .github/workflows"
+            exit 0
+          fi
+          
+          echo "📄 Found workflow files:"
+          echo "$workflow_files"
+          echo ""
+          
+          # Validate each workflow file
+          validation_passed=true
+          
+          for file in $workflow_files; do
+            echo "🔍 Validating: $file"
+            
+            if yamllint "$file"; then
+              echo "✅ $file passed YAML validation"
+            else
+              echo "❌ $file failed YAML validation"
+              validation_passed=false
+            fi
+            echo ""
+          done
+          
+          if [ "$validation_passed" = true ]; then
+            echo "🎉 All workflow files passed validation!"
+          else
+            echo "❌ Some workflow files failed validation"
+            exit 1
+          fi
+
+      - name: 🔍 Validate Repository Structure
+        run: |
+          echo "=== Repository Structure Validation ==="
+          
+          # Check for essential GitHub files
+          echo "📋 Checking GitHub configuration files..."
+          
+          if [ -f ".github/CODEOWNERS" ] || [ -f "CODEOWNERS" ]; then
+            echo "✅ CODEOWNERS file found"
+          else
+            echo "ℹ️ CODEOWNERS file not found (optional)"
+          fi
+          
+          if [ -f ".github/PULL_REQUEST_TEMPLATE.md" ] || [ -f "PULL_REQUEST_TEMPLATE.md" ]; then
+            echo "✅ Pull request template found"
+          else
+            echo "ℹ️ Pull request template not found (optional)"
+          fi
+          
+          if [ -d ".github/ISSUE_TEMPLATE" ]; then
+            echo "✅ Issue templates directory found"
+            template_count=$(find .github/ISSUE_TEMPLATE -name "*.yml" -o -name "*.yaml" -o -name "*.md" | wc -l)
+            echo "  📄 Issue templates: $template_count"
+          else
+            echo "ℹ️ Issue templates not found (optional)"
+          fi
+          
+          # Check for security files
+          if [ -f "SECURITY.md" ] || [ -f ".github/SECURITY.md" ]; then
+            echo "✅ Security policy found"
+          else
+            echo "ℹ️ Security policy not found (recommended)"
+          fi
+          
+          # Check for contribution guidelines
+          if [ -f "CONTRIBUTING.md" ] || [ -f ".github/CONTRIBUTING.md" ]; then
+            echo "✅ Contributing guidelines found"
+          else
+            echo "ℹ️ Contributing guidelines not found (recommended)"
+          fi
+
+      - name: 📊 Generate Configuration Report
+        if: always()
+        run: |
+          echo "=== GitHub Configuration Report ==="
+          
+          # Count workflows
+          workflow_count=$(find .github/workflows -name "*.yml" -o -name "*.yaml" 2>/dev/null | wc -l)
+          
+          # Count issue templates
+          issue_template_count=$(find .github/ISSUE_TEMPLATE -name "*.yml" -o -name "*.yaml" -o -name "*.md" 2>/dev/null | wc -l)
+          
+          cat > github-config-report.md << EOF
+          # 🔧 GitHub Configuration Report
+          
+          ## 📊 Configuration Summary
+          
+          ### Workflows
+          - **Total Workflows**: $workflow_count
+          - **Workflow Files**: 
+          $(find .github/workflows -name "*.yml" -o -name "*.yaml" 2>/dev/null | sed 's/^/  - /' || echo "  - None found")
+          
+          ### Templates and Guidelines
+          - **Pull Request Template**: $([ -f ".github/PULL_REQUEST_TEMPLATE.md" ] || [ -f "PULL_REQUEST_TEMPLATE.md" ] && echo "✅ Present" || echo "❌ Missing")
+          - **Issue Templates**: $issue_template_count templates
+          - **Contributing Guidelines**: $([ -f "CONTRIBUTING.md" ] || [ -f ".github/CONTRIBUTING.md" ] && echo "✅ Present" || echo "⚠️ Missing")
+          - **Security Policy**: $([ -f "SECURITY.md" ] || [ -f ".github/SECURITY.md" ] && echo "✅ Present" || echo "⚠️ Missing")
+          - **Code Owners**: $([ -f ".github/CODEOWNERS" ] || [ -f "CODEOWNERS" ] && echo "✅ Present" || echo "ℹ️ Not configured")
+          
+          ### Repository Health
+          $([ ! -f "CONTRIBUTING.md" ] && [ ! -f ".github/CONTRIBUTING.md" ] && echo "- 📝 Consider adding CONTRIBUTING.md")
+          $([ ! -f "SECURITY.md" ] && [ ! -f ".github/SECURITY.md" ] && echo "- 🔒 Consider adding SECURITY.md")
+          $([ ! -f ".github/CODEOWNERS" ] && [ ! -f "CODEOWNERS" ] && echo "- 👥 Consider adding CODEOWNERS file")
+          $([ $issue_template_count -eq 0 ] && echo "- 🐛 Consider adding issue templates")
+          
+          ---
+          Generated on $(date)
+          EOF
+          
+          echo "📋 Configuration Report:"
+          cat github-config-report.md
+
+      - name: 📤 Upload Configuration Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: github-config-report
+          path: github-config-report.md
+          retention-days: 7

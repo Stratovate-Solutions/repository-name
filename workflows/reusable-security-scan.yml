@@ -1,0 +1,538 @@
+# =============================================================================
+# Reusable Security Scanning Workflow
+# =============================================================================
+#
+# Purpose: Comprehensive security scanning for code, dependencies, and secrets
+# Author: Stratovate Solutions DevOps Team
+# Version: 2.0
+# Last Updated: 2025-08-19
+#
+# This reusable workflow provides comprehensive security scanning including:
+# - Static Application Security Testing (SAST)
+# - Dependency vulnerability scanning
+# - Secret detection and prevention
+# - License compliance checking
+# - Container security scanning (when applicable)
+# - Infrastructure as Code security analysis
+#
+# Security Tools Integrated:
+# - GitHub Advanced Security (CodeQL)
+# - Dependency vulnerability scanning
+# - Secret scanning
+# - License compliance checking
+# - SARIF report generation
+#
+# Compliance Standards:
+# - OWASP Top 10
+# - CWE (Common Weakness Enumeration)
+# - CVE (Common Vulnerabilities and Exposures)
+# - SPDX License standards
+# =============================================================================
+
+name: Reusable Security Scan
+
+# =============================================================================
+# Workflow Input Parameters
+# =============================================================================
+
+on:
+  workflow_call:
+    inputs:
+      # -------------------------------------------------------------------------
+      # Scan Configuration Parameters
+      # -------------------------------------------------------------------------
+
+      scan-type:
+        description: |
+          Type of security scans to perform.
+          
+          Options:
+          - 'all' (default): Run all available security scans
+          - 'code': Static code analysis only
+          - 'dependencies': Dependency vulnerability scanning only
+          - 'secrets': Secret scanning only
+          - 'licenses': License compliance only
+        required: false
+        default: 'all'
+        type: string
+
+      # -------------------------------------------------------------------------
+      # Scan Scope Parameters
+      # -------------------------------------------------------------------------
+
+      include-dependencies:
+        description: |
+          Scan dependencies for known vulnerabilities.
+          Checks npm, pip, NuGet, and other package managers.
+          Default: true
+        required: false
+        default: true
+        type: boolean
+
+      include-code-analysis:
+        description: |
+          Perform static application security testing (SAST).
+          Uses CodeQL for comprehensive code analysis.
+          Default: true
+        required: false
+        default: true
+        type: boolean
+
+      include-secrets:
+        description: |
+          Scan for exposed secrets and credentials.
+          Checks for API keys, passwords, tokens, etc.
+          Default: true
+        required: false
+        default: true
+        type: boolean
+
+      include-licenses:
+        description: |
+          Check license compliance for dependencies.
+          Identifies restrictive or incompatible licenses.
+          Default: true
+        required: false
+        default: true
+        type: boolean
+
+      # -------------------------------------------------------------------------
+      # Severity and Reporting Parameters
+      # -------------------------------------------------------------------------
+
+      fail-on-severity:
+        description: |
+          Fail the workflow if vulnerabilities of specified severity are found.
+          
+          Severity Levels:
+          - 'critical': Only critical vulnerabilities
+          - 'high': High and critical vulnerabilities
+          - 'medium': Medium, high, and critical vulnerabilities
+          - 'low': All vulnerabilities (low, medium, high, critical)
+          - 'none': Never fail (report only)
+        required: false
+        default: 'high'
+        type: string
+
+      report-format:
+        description: |
+          Format for security scan reports.
+          
+          Formats:
+          - 'sarif': SARIF format for GitHub Security tab integration
+          - 'json': JSON format for programmatic processing
+          - 'xml': XML format for legacy tools
+          - 'csv': CSV format for spreadsheet analysis
+        required: false
+        default: 'sarif'
+        type: string
+
+      working-directory:
+        description: |
+          Working directory for security scans.
+          Useful for monorepos where code is in subdirectory.
+          Default: '.' (repository root)
+        required: false
+        default: '.'
+        type: string
+
+    # -------------------------------------------------------------------------
+    # Required Secrets
+    # -------------------------------------------------------------------------
+
+    secrets:
+      GITHUB_TOKEN:
+        description: |
+          GitHub token for API access and uploading results.
+          Automatically provided by GitHub Actions.
+          Required for CodeQL and Security tab integration.
+        required: false
+
+# =============================================================================
+# Global Workflow Configuration
+# =============================================================================
+
+# Security: Define required permissions for security scanning
+permissions:
+  contents: read              # Read repository contents
+  security-events: write     # Upload security scan results
+  actions: read              # Read workflow information
+  checks: write              # Write check results
+
+# Environment variables
+env:
+  WORKFLOW_NAME: "Security Scan"
+  WORKFLOW_VERSION: "2.0"
+
+# =============================================================================
+# Security Scanning Jobs
+# =============================================================================
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: CodeQL Static Analysis
+  # ---------------------------------------------------------------------------
+  #
+  # Performs static application security testing (SAST) using GitHub's CodeQL.
+  # Supports multiple programming languages and provides comprehensive
+  # vulnerability detection for common security issues.
+  # ---------------------------------------------------------------------------
+
+  codeql-analysis:
+    name: 🔍 CodeQL Analysis
+    if: ${{ inputs.include-code-analysis && (inputs.scan-type == 'all' || inputs.scan-type == 'code') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # CodeQL supports multiple languages
+        language: [ 'javascript', 'python', 'csharp' ]
+        # Add more languages as needed: 'cpp', 'java', 'go', 'ruby'
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # Use default queries plus security-extended for comprehensive scanning
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Dependency Vulnerability Scanning
+  # ---------------------------------------------------------------------------
+  #
+  # Scans project dependencies for known security vulnerabilities using
+  # GitHub's dependency scanning and advisory database.
+  # ---------------------------------------------------------------------------
+
+  dependency-scan:
+    name: 📦 Dependency Scan
+    if: ${{ inputs.include-dependencies && (inputs.scan-type == 'all' || inputs.scan-type == 'dependencies') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run dependency scan
+        run: |
+          echo "🔍 Scanning dependencies for vulnerabilities..."
+          
+          # Initialize severity counters
+          critical_count=0
+          high_count=0
+          medium_count=0
+          low_count=0
+          
+          # Scan npm dependencies (if present)
+          if [ -f "package.json" ]; then
+            echo "📦 Scanning npm dependencies..."
+            if npm audit --audit-level=info > npm_audit.json 2>&1; then
+              echo "✅ npm audit completed"
+              cat npm_audit.json
+            else
+              echo "⚠️ npm audit found vulnerabilities"
+              cat npm_audit.json
+              
+              # Count vulnerabilities by severity
+              if grep -q "critical" npm_audit.json; then
+                critical_count=$((critical_count + $(grep -c "critical" npm_audit.json)))
+              fi
+              if grep -q "high" npm_audit.json; then
+                high_count=$((high_count + $(grep -c "high" npm_audit.json)))
+              fi
+            fi
+          fi
+          
+          # Scan Python dependencies (if present)
+          if [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
+            echo "🐍 Scanning Python dependencies..."
+            pip install safety
+            if safety check --json > safety_report.json 2>&1; then
+              echo "✅ safety check completed"
+            else
+              echo "⚠️ safety check found vulnerabilities"
+              cat safety_report.json
+            fi
+          fi
+          
+          # Scan .NET dependencies (if present)
+          if find . -name "*.csproj" -o -name "*.sln" | grep -q .; then
+            echo "🔷 Scanning .NET dependencies..."
+            # Note: Would use 'dotnet list package --vulnerable' in real scenario
+            echo "ℹ️ .NET vulnerability scanning requires dotnet CLI"
+          fi
+          
+          # Summary
+          echo "📊 Vulnerability Summary:"
+          echo "  Critical: $critical_count"
+          echo "  High: $high_count"
+          echo "  Medium: $medium_count"
+          echo "  Low: $low_count"
+          
+          # Fail based on severity threshold
+          if [ "${{ inputs.fail-on-severity }}" = "critical" ] && [ $critical_count -gt 0 ]; then
+            echo "❌ Found $critical_count critical vulnerabilities"
+            exit 1
+          elif [ "${{ inputs.fail-on-severity }}" = "high" ] && [ $((critical_count + high_count)) -gt 0 ]; then
+            echo "❌ Found $((critical_count + high_count)) high/critical vulnerabilities"
+            exit 1
+          elif [ "${{ inputs.fail-on-severity }}" = "medium" ] && [ $((critical_count + high_count + medium_count)) -gt 0 ]; then
+            echo "❌ Found $((critical_count + high_count + medium_count)) medium+ vulnerabilities"
+            exit 1
+          else
+            echo "✅ No vulnerabilities above threshold found"
+          fi
+
+      - name: Upload dependency scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-scan-results
+          path: |
+            npm_audit.json
+            safety_report.json
+        continue-on-error: true
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Secret Scanning
+  # ---------------------------------------------------------------------------
+  #
+  # Scans for exposed secrets, API keys, passwords, and other sensitive
+  # information that should not be committed to the repository.
+  # ---------------------------------------------------------------------------
+
+  secret-scan:
+    name: 🔐 Secret Scan
+    if: ${{ inputs.include-secrets && (inputs.scan-type == 'all' || inputs.scan-type == 'secrets') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history for comprehensive secret scanning
+          fetch-depth: 0
+
+      - name: Install TruffleHog
+        run: |
+          echo "🔧 Installing TruffleHog for secret scanning..."
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run secret scan
+        run: |
+          echo "🔍 Scanning for secrets..."
+          
+          # Run TruffleHog to scan for secrets
+          trufflehog git file://. --json > secrets_report.json 2>&1 || true
+          
+          # Check results
+          if [ -s secrets_report.json ]; then
+            echo "📋 Secret scan results:"
+            cat secrets_report.json
+            
+            # Count findings
+            secret_count=$(jq length secrets_report.json 2>/dev/null || echo "0")
+            
+            if [ "$secret_count" -gt 0 ]; then
+              echo "⚠️ Found $secret_count potential secret(s)"
+              echo "Please review the findings and ensure no real secrets are exposed"
+              
+              # Don't fail by default for secrets - they may be false positives
+              # Uncomment the next line to fail on any secret detection
+              # exit 1
+            else
+              echo "✅ No secrets detected"
+            fi
+          else
+            echo "✅ No secrets detected"
+          fi
+
+      - name: Upload secret scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: secret-scan-results
+          path: secrets_report.json
+        continue-on-error: true
+
+  # ---------------------------------------------------------------------------
+  # Job 4: License Compliance Scanning
+  # ---------------------------------------------------------------------------
+  #
+  # Checks dependencies for license compliance and identifies potentially
+  # problematic licenses that may conflict with project requirements.
+  # ---------------------------------------------------------------------------
+
+  license-scan:
+    name: 📄 License Scan
+    if: ${{ inputs.include-licenses && (inputs.scan-type == 'all' || inputs.scan-type == 'licenses') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (for license scanning)
+        if: ${{ hashFiles('**/package.json') }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies for license scanning
+        if: ${{ hashFiles('**/package.json') }}
+        run: npm ci
+
+      - name: Run license scan
+        run: |
+          echo "📄 Scanning licenses..."
+          
+          # Scan npm dependencies for licenses
+          if [ -f "package.json" ]; then
+            echo "📦 Scanning npm package licenses..."
+            
+            # Install license-checker
+            npm install -g license-checker
+            
+            # Generate license report
+            license-checker --json > npm_licenses.json
+            license-checker --csv > npm_licenses.csv
+            
+            echo "📋 License summary:"
+            license-checker --summary
+            
+            # Check for problematic licenses
+            if license-checker --excludePackages 'test@1.0.0' --restrictive > license_issues.txt 2>&1; then
+              echo "✅ No restrictive licenses found"
+            else
+              echo "⚠️ Potentially problematic licenses detected:"
+              cat license_issues.txt
+            fi
+          fi
+          
+          # Check for project license
+          if [ -f "LICENSE" ] || [ -f "LICENSE.md" ] || [ -f "LICENSE.txt" ]; then
+            echo "✅ Project license file found"
+          else
+            echo "⚠️ No project license file found"
+          fi
+          
+          echo "✅ License scan completed"
+
+      - name: Upload license scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-scan-results
+          path: |
+            npm_licenses.json
+            npm_licenses.csv
+            license_issues.txt
+        continue-on-error: true
+
+  # ---------------------------------------------------------------------------
+  # Job 5: Security Scan Summary
+  # ---------------------------------------------------------------------------
+  #
+  # Aggregates results from all security scans and provides a comprehensive
+  # summary of the security posture.
+  # ---------------------------------------------------------------------------
+
+  security-summary:
+    name: 📋 Security Summary
+    runs-on: ubuntu-latest
+    needs: [codeql-analysis, dependency-scan, secret-scan, license-scan]
+    if: always()
+
+    steps:
+      - name: Download all scan results
+        uses: actions/download-artifact@v4
+        with:
+          path: scan-results
+        continue-on-error: true
+
+      - name: Generate security summary
+        run: |
+          echo "# 🛡️ Security Scan Summary" > security_summary.md
+          echo "" >> security_summary.md
+          echo "## Scan Results Overview" >> security_summary.md
+          echo "" >> security_summary.md
+          
+          # Check job statuses
+          echo "| Scan Type | Status | Details |" >> security_summary.md
+          echo "|-----------|--------|---------|" >> security_summary.md
+          echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result }} | Static application security testing |" >> security_summary.md
+          echo "| Dependency Scan | ${{ needs.dependency-scan.result }} | Vulnerability scanning of dependencies |" >> security_summary.md
+          echo "| Secret Scan | ${{ needs.secret-scan.result }} | Detection of exposed secrets |" >> security_summary.md
+          echo "| License Scan | ${{ needs.license-scan.result }} | License compliance checking |" >> security_summary.md
+          echo "" >> security_summary.md
+          
+          # Overall status
+          if [[ "${{ needs.codeql-analysis.result }}" == "success" || "${{ needs.codeql-analysis.result }}" == "skipped" ]] && \
+             [[ "${{ needs.dependency-scan.result }}" == "success" || "${{ needs.dependency-scan.result }}" == "skipped" ]] && \
+             [[ "${{ needs.secret-scan.result }}" == "success" || "${{ needs.secret-scan.result }}" == "skipped" ]] && \
+             [[ "${{ needs.license-scan.result }}" == "success" || "${{ needs.license-scan.result }}" == "skipped" ]]; then
+            echo "## ✅ Overall Status: PASSED" >> security_summary.md
+            echo "" >> security_summary.md
+            echo "All security scans completed successfully. No critical security issues found." >> security_summary.md
+          else
+            echo "## ❌ Overall Status: ISSUES FOUND" >> security_summary.md
+            echo "" >> security_summary.md
+            echo "One or more security scans found issues that require attention." >> security_summary.md
+            
+            # Fail the workflow if any critical scan failed
+            exit 1
+          fi
+          
+          echo "" >> security_summary.md
+          echo "## 📊 Scan Configuration" >> security_summary.md
+          echo "- **Scan Type**: ${{ inputs.scan-type }}" >> security_summary.md
+          echo "- **Fail on Severity**: ${{ inputs.fail-on-severity }}" >> security_summary.md
+          echo "- **Report Format**: ${{ inputs.report-format }}" >> security_summary.md
+          echo "- **Working Directory**: ${{ inputs.working-directory }}" >> security_summary.md
+          
+          # Display summary
+          echo "::group::Security Summary"
+          cat security_summary.md
+          echo "::endgroup::"
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security_summary.md

@@ -13,9 +13,6 @@
 #>
 
 BeforeAll {
-    # Import the script to test
-    $scriptPath = Join-Path $PSScriptRoot ".." "BranchProtectionPolicy.ps1"
-    
     # Mock external dependencies
     Mock Invoke-RestMethod { return @{ status = "success" } }
     Mock Start-Sleep { }
