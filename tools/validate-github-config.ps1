@@ -28,6 +28,16 @@ $Yellow = "`e[33m"
 $Blue = "`e[34m"
 $Reset = "`e[0m"
 
+<#
+.SYNOPSIS
+    Writes colored output to the console.
+.DESCRIPTION
+    Helper function to write colored text output to the console using ANSI escape codes.
+.PARAMETER Message
+    The message to display.
+.PARAMETER Color
+    The ANSI color code to use. Defaults to reset.
+#>
 function Write-ColorOutput {
     param(
         [string]$Message,
@@ -36,31 +46,81 @@ function Write-ColorOutput {
     Write-Host "${Color}${Message}${Reset}"
 }
 
+<#
+.SYNOPSIS
+    Writes a success message with green color and checkmark.
+.DESCRIPTION
+    Helper function to write success messages in a consistent format.
+.PARAMETER Message
+    The success message to display.
+#>
 function Write-Success {
     param([string]$Message)
     Write-ColorOutput "✓ $Message" $Green
 }
 
-function Write-Warning {
+<#
+.SYNOPSIS
+    Writes a warning message with yellow color and warning symbol.
+.DESCRIPTION
+    Helper function to write warning messages in a consistent format.
+.PARAMETER Message
+    The warning message to display.
+#>
+function Write-WarningMessage {
     param([string]$Message)
     Write-ColorOutput "⚠ $Message" $Yellow
 }
 
-function Write-Error {
+<#
+.SYNOPSIS
+    Writes an error message with red color and error symbol.
+.DESCRIPTION
+    Helper function to write error messages in a consistent format.
+.PARAMETER Message
+    The error message to display.
+#>
+function Write-ErrorMessage {
     param([string]$Message)
     Write-ColorOutput "✗ $Message" $Red
 }
 
+<#
+.SYNOPSIS
+    Writes an informational message with blue color and info symbol.
+.DESCRIPTION
+    Helper function to write informational messages in a consistent format.
+.PARAMETER Message
+    The informational message to display.
+#>
 function Write-Info {
     param([string]$Message)
     Write-ColorOutput "ℹ $Message" $Blue
 }
 
+<#
+.SYNOPSIS
+    Tests if a command exists in the current session.
+.DESCRIPTION
+    Helper function to check if a command is available before attempting to use it.
+.PARAMETER Command
+    The command name to test.
+.OUTPUTS
+    Boolean indicating whether the command exists.
+#>
 function Test-CommandExists {
     param([string]$Command)
     return $null -ne (Get-Command $Command -ErrorAction SilentlyContinue)
 }
 
+<#
+.SYNOPSIS
+    Gets the Python scripts directory path.
+.DESCRIPTION
+    Locates the Python scripts directory by checking pip installation location and common paths.
+.OUTPUTS
+    String path to Python scripts directory, or null if not found.
+#>
 function Get-PythonScriptsPath {
     # Get Python scripts directory from pip show
     try {
@@ -95,6 +155,18 @@ function Get-PythonScriptsPath {
     }
 }
 
+<#
+.SYNOPSIS
+    Invokes yamllint to validate YAML files.
+.DESCRIPTION
+    Runs yamllint command with various fallback methods to validate YAML syntax and style.
+.PARAMETER FilePath
+    Path to the YAML file to validate.
+.PARAMETER ConfigFile
+    Optional path to yamllint configuration file.
+.OUTPUTS
+    Output from yamllint command.
+#>
 function Invoke-YamlLint {
     param(
         [string]$FilePath,
@@ -135,12 +207,18 @@ function Invoke-YamlLint {
     }
 }
 
+<#
+.SYNOPSIS
+    Installs required tools for validation.
+.DESCRIPTION
+    Installs necessary Python packages and PowerShell modules required for GitHub configuration validation.
+#>
 function Install-RequiredTools {
     Write-Info "Installing required tools..."
     
     # Check if Python is installed
     if (-not (Test-CommandExists "python")) {
-        Write-Error "Python is not installed. Please install Python first."
+        Write-ErrorMessage "Python is not installed. Please install Python first."
         exit 1
     }
     
@@ -151,7 +229,7 @@ function Install-RequiredTools {
             Install-Module -Name PowerShell-Yaml -Force -Scope CurrentUser -AllowClobber
             Write-Success "PowerShell-Yaml module installed"
         } catch {
-            Write-Warning "Failed to install PowerShell-Yaml module: $_"
+            Write-WarningMessage "Failed to install PowerShell-Yaml module: $_"
             Write-Info "Will use Python fallback for YAML parsing"
         }
     }
@@ -162,12 +240,12 @@ function Install-RequiredTools {
         python -m pip install yamllint --user
         Write-Success "yamllint installed"
     } catch {
-        Write-Error "Failed to install yamllint: $_"
+        Write-ErrorMessage "Failed to install yamllint: $_"
     }
     
     # Check if Node.js is installed
     if (-not (Test-CommandExists "node")) {
-        Write-Warning "Node.js is not installed. Some schema validation will be skipped."
+        Write-WarningMessage "Node.js is not installed. Some schema validation will be skipped."
     } else {
         # Install markdownlint-cli2
         if (-not (Test-CommandExists "markdownlint-cli2")) {
@@ -190,6 +268,16 @@ function Install-RequiredTools {
     Write-Success "Tool installation completed"
 }
 
+<#
+.SYNOPSIS
+    Tests and validates YAML files.
+.DESCRIPTION
+    Validates all YAML files in the .github directory using yamllint for syntax and style checking.
+.PARAMETER Verbose
+    Enable verbose output.
+.OUTPUTS
+    Number of errors found.
+#>
 function Test-YamlFiles {
     Write-Info "Linting YAML files..."
     
@@ -199,7 +287,7 @@ function Test-YamlFiles {
     $yamlFiles += Get-ChildItem -Path "." -Filter "*.yaml" | Where-Object { $_.FullName -notmatch "\.github\\workflows" }
     
     if ($yamlFiles.Count -eq 0) {
-        Write-Warning "No YAML files found"
+        Write-WarningMessage "No YAML files found"
         return
     }
     
@@ -219,12 +307,12 @@ function Test-YamlFiles {
                     Write-Success "$($file.Name) passed YAML linting"
                 }
             } else {
-                Write-Error "YAML linting failed for $($file.Name):"
-                Write-Host $result
+                Write-ErrorMessage "YAML linting failed for $($file.Name):"
+                Write-Output $result
                 $errors++
             }
         } catch {
-            Write-Error "Failed to lint $($file.Name): $_"
+            Write-ErrorMessage "Failed to lint $($file.Name): $_"
             $errors++
         }
     }
@@ -232,12 +320,22 @@ function Test-YamlFiles {
     if ($errors -eq 0) {
         Write-Success "All YAML files passed linting"
     } else {
-        Write-Error "$errors YAML files failed linting"
+        Write-ErrorMessage "$errors YAML files failed linting"
     }
     
     return $errors
 }
 
+<#
+.SYNOPSIS
+    Tests and validates Markdown files.
+.DESCRIPTION
+    Validates all Markdown files in the repository using markdownlint for style and formatting.
+.PARAMETER Verbose
+    Enable verbose output.
+.OUTPUTS
+    Number of errors found.
+#>
 function Test-MarkdownFiles {
     Write-Info "Linting Markdown files..."
     
@@ -246,7 +344,7 @@ function Test-MarkdownFiles {
     }
     
     if ($markdownFiles.Count -eq 0) {
-        Write-Warning "No Markdown files found"
+        Write-WarningMessage "No Markdown files found"
         return 0
     }
     
@@ -257,42 +355,53 @@ function Test-MarkdownFiles {
     
     if (Test-CommandExists "markdownlint-cli2") {
         try {
-            $configParam = if ($configFile) { "--config $configFile" } else { "" }
             $markdownPaths = $markdownFiles | ForEach-Object { 
                 $relativePath = (Resolve-Path $_.FullName -Relative) -replace '^\.\\', ''
                 $relativePath -replace '\\', '/'
             }
             
-            # Create a temp file with the list of files to process
-            $tempFileList = [System.IO.Path]::GetTempFileName()
-            $markdownPaths | Out-File -FilePath $tempFileList -Encoding UTF8
+            # Build arguments array for direct execution
+            $lintArgs = @()
+            if ($configFile) {
+                $lintArgs += "--config"
+                $lintArgs += $configFile
+            }
+            $lintArgs += $markdownPaths
             
-            $cmd = "markdownlint-cli2 $configParam --stdin < `"$tempFileList`""
             if ($Verbose) {
-                Write-Info "Running: $cmd"
+                Write-Info "Running: markdownlint-cli2 $($lintArgs -join ' ')"
             }
             
-            $result = Invoke-Expression $cmd 2>&1
-            Remove-Item $tempFileList -Force -ErrorAction SilentlyContinue
+            $result = & markdownlint-cli2 @lintArgs 2>&1
             
             if ($LASTEXITCODE -eq 0) {
                 Write-Success "All Markdown files passed linting"
             } else {
-                Write-Error "Markdown linting failed:"
-                Write-Host $result
+                Write-ErrorMessage "Markdown linting failed:"
+                Write-Output $result
                 $errors++
             }
         } catch {
-            Write-Error "Failed to lint Markdown files: $_"
+            Write-ErrorMessage "Failed to lint Markdown files: $_"
             $errors++
         }
     } else {
-        Write-Warning "markdownlint-cli2 not available, skipping Markdown linting"
+        Write-WarningMessage "markdownlint-cli2 not available, skipping Markdown linting"
     }
     
     return $errors
 }
 
+<#
+.SYNOPSIS
+    Tests and validates JSON files.
+.DESCRIPTION
+    Validates all JSON files in the repository for proper syntax and structure.
+.PARAMETER Verbose
+    Enable verbose output.
+.OUTPUTS
+    Number of errors found.
+#>
 function Test-JsonFiles {
     Write-Info "Validating JSON files..."
     
@@ -301,7 +410,7 @@ function Test-JsonFiles {
     }
     
     if ($jsonFiles.Count -eq 0) {
-        Write-Warning "No JSON files found"
+        Write-WarningMessage "No JSON files found"
         return 0
     }
     
@@ -314,11 +423,13 @@ function Test-JsonFiles {
         
         try {
             $content = Get-Content $file.FullName -Raw | ConvertFrom-Json
+            # Content loaded successfully, JSON is valid
+            $null = $content  # Suppress unused variable warning
             if ($Verbose) {
                 Write-Success "$($file.Name) is valid JSON"
             }
         } catch {
-            Write-Error "Invalid JSON in $($file.Name): $_"
+            Write-ErrorMessage "Invalid JSON in $($file.Name): $_"
             $errors++
         }
     }
@@ -326,18 +437,28 @@ function Test-JsonFiles {
     if ($errors -eq 0) {
         Write-Success "All JSON files are valid"
     } else {
-        Write-Error "$errors JSON files are invalid"
+        Write-ErrorMessage "$errors JSON files are invalid"
     }
     
     return $errors
 }
 
+<#
+.SYNOPSIS
+    Tests and validates GitHub issue templates.
+.DESCRIPTION
+    Validates GitHub issue templates for proper structure and required fields.
+.PARAMETER Verbose
+    Enable verbose output.
+.OUTPUTS
+    Number of errors found.
+#>
 function Test-IssueTemplates {
     Write-Info "Testing issue templates..."
     
     $templateDir = "ISSUE_TEMPLATE"
     if (-not (Test-Path $templateDir)) {
-        Write-Warning "Issue template directory not found"
+        Write-WarningMessage "Issue template directory not found"
         return 0
     }
     
@@ -346,7 +467,7 @@ function Test-IssueTemplates {
     $templates += Get-ChildItem -Path $templateDir -Filter "*.md"
     
     if ($templates.Count -eq 0) {
-        Write-Warning "No issue templates found"
+        Write-WarningMessage "No issue templates found"
         return 0
     }
     
@@ -360,6 +481,14 @@ function Test-IssueTemplates {
         }
         
         if ($template.Extension -in @(".yml", ".yaml")) {
+            # Skip config.yml as it's not an issue template but a configuration file
+            if ($template.Name -eq "config.yml") {
+                if ($Verbose) {
+                    Write-Info "Skipping $($template.Name) (configuration file)"
+                }
+                continue
+            }
+            
             # Test YAML issue templates
             try {
                 $content = Get-Content $template.FullName -Raw | ConvertFrom-Yaml
@@ -367,7 +496,7 @@ function Test-IssueTemplates {
                 $requiredFields = @("name", "description", "body")
                 foreach ($field in $requiredFields) {
                     if (-not $content.$field) {
-                        Write-Error "$($template.Name) missing required field: $field"
+                        Write-ErrorMessage "$($template.Name) missing required field: $field"
                         $errors++
                     }
                 }
@@ -376,7 +505,7 @@ function Test-IssueTemplates {
                     Write-Success "$($template.Name) is valid"
                 }
             } catch {
-                Write-Error "Failed to parse YAML template $($template.Name): $_"
+                Write-ErrorMessage "Failed to parse YAML template $($template.Name): $_"
                 $errors++
             }
         } elseif ($template.Extension -eq ".md") {
@@ -388,7 +517,7 @@ function Test-IssueTemplates {
                     Write-Success "$($template.Name) has YAML frontmatter"
                 }
             } else {
-                Write-Warning "$($template.Name) may not have YAML frontmatter"
+                Write-WarningMessage "$($template.Name) may not have YAML frontmatter"
             }
         }
     }
@@ -396,12 +525,22 @@ function Test-IssueTemplates {
     if ($errors -eq 0) {
         Write-Success "All issue templates are valid"
     } else {
-        Write-Error "$errors issue template issues found"
+        Write-ErrorMessage "$errors issue template issues found"
     }
     
     return $errors
 }
 
+<#
+.SYNOPSIS
+    Tests and validates GitHub pull request templates.
+.DESCRIPTION
+    Validates GitHub pull request templates for proper structure and formatting.
+.PARAMETER Verbose
+    Enable verbose output.
+.OUTPUTS
+    Number of errors found.
+#>
 function Test-PullRequestTemplates {
     Write-Info "Testing PR templates..."
     
@@ -431,7 +570,7 @@ function Test-PullRequestTemplates {
     }
     
     if ($prTemplates.Count -eq 0) {
-        Write-Warning "No PR templates found"
+        Write-WarningMessage "No PR templates found"
         return 0
     }
     
@@ -448,7 +587,7 @@ function Test-PullRequestTemplates {
             $content = Get-Content $template -Raw
             
             if ([string]::IsNullOrWhiteSpace($content)) {
-                Write-Error "PR template $template is empty"
+                Write-ErrorMessage "PR template $template is empty"
                 $errors++
             } else {
                 if ($Verbose) {
@@ -474,18 +613,28 @@ function Test-PullRequestTemplates {
     if ($errors -eq 0) {
         Write-Success "All PR templates are valid"
     } else {
-        Write-Error "$errors PR template issues found"
+        Write-ErrorMessage "$errors PR template issues found"
     }
     
     return $errors
 }
 
+<#
+.SYNOPSIS
+    Tests and validates GitHub workflow files.
+.DESCRIPTION
+    Validates GitHub Actions workflow files for proper YAML syntax and structure.
+.PARAMETER Verbose
+    Enable verbose output.
+.OUTPUTS
+    Number of errors found.
+#>
 function Test-WorkflowFiles {
     Write-Info "Testing workflow files..."
     
     $workflowDir = ".github/workflows"
     if (-not (Test-Path $workflowDir)) {
-        Write-Warning "Workflows directory not found"
+        Write-WarningMessage "Workflows directory not found"
         return 0
     }
     
@@ -493,7 +642,7 @@ function Test-WorkflowFiles {
     $workflows += Get-ChildItem -Path $workflowDir -Filter "*.yaml"
     
     if ($workflows.Count -eq 0) {
-        Write-Warning "No workflow files found"
+        Write-WarningMessage "No workflow files found"
         return 0
     }
     
@@ -510,20 +659,20 @@ function Test-WorkflowFiles {
             $requiredFields = @("on", "jobs")
             foreach ($field in $requiredFields) {
                 if (-not $content.$field) {
-                    Write-Error "$($workflow.Name) missing required field: $field"
+                    Write-ErrorMessage "$($workflow.Name) missing required field: $field"
                     $errors++
                 }
             }
             
             if (-not $content.name) {
-                Write-Warning "$($workflow.Name) missing 'name' field"
+                Write-WarningMessage "$($workflow.Name) missing 'name' field"
             }
             
             if ($errors -eq 0 -and $Verbose) {
                 Write-Success "$($workflow.Name) has valid structure"
             }
         } catch {
-            Write-Error "Failed to parse workflow $($workflow.Name): $_"
+            Write-ErrorMessage "Failed to parse workflow $($workflow.Name): $_"
             $errors++
         }
     }
@@ -531,13 +680,23 @@ function Test-WorkflowFiles {
     if ($errors -eq 0) {
         Write-Success "All workflow files are valid"
     } else {
-        Write-Error "$errors workflow issues found"
+        Write-ErrorMessage "$errors workflow issues found"
     }
     
     return $errors
 }
 
 # Helper function to convert YAML (requires PowerShell-Yaml module)
+<#
+.SYNOPSIS
+    Converts YAML string to PowerShell object.
+.DESCRIPTION
+    Converts YAML content to PowerShell objects using PowerShell-Yaml module or Python fallback.
+.PARAMETER InputObject
+    The YAML string to convert.
+.OUTPUTS
+    PowerShell object representation of the YAML content.
+#>
 function ConvertFrom-Yaml {
     param([string]$InputObject)
     
@@ -547,7 +706,8 @@ function ConvertFrom-Yaml {
             Import-Module PowerShell-Yaml -Force
             return ConvertFrom-Yaml $InputObject
         } catch {
-            # Continue to fallback methods
+            # PowerShell-Yaml module failed, continue to fallback methods
+            Write-WarningMessage "PowerShell-Yaml module failed: $($_.Exception.Message)"
         }
     }
     
@@ -634,6 +794,6 @@ if ($totalErrors -eq 0) {
     Write-Success "All validation checks passed! ✨"
     exit 0
 } else {
-    Write-Error "Validation failed with $totalErrors errors"
+    Write-ErrorMessage "Validation failed with $totalErrors errors"
     exit 1
 }

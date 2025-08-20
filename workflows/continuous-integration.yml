@@ -135,26 +135,8 @@ jobs:
 
   ci:
     name: 🔍 Build & Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 30  # Prevent runaway jobs
-
     # Skip CI on draft PRs (optional optimization)
     if: github.event.pull_request.draft != true
-
-    steps:
-      - name: 📊 Workflow Information
-        run: |
-          echo "::group::Workflow Context"
-          echo "Workflow: ${{ github.workflow }}"
-          echo "Repository: ${{ github.repository }}"
-          echo "Branch: ${{ github.ref_name }}"
-          echo "Event: ${{ github.event_name }}"
-          echo "Actor: ${{ github.actor }}"
-          echo "Run ID: ${{ github.run_id }}"
-          echo "Debug Mode: ${{ github.event.inputs.debug || 'false' }}"
-          echo "Skip Tests: ${{ github.event.inputs.skip-tests || 'false' }}"
-          echo "::endgroup::"
-
     # Use our centralized reusable CI workflow
     uses: Stratovate-Solutions/.github/.github/workflows/reusable-ci.yml@main
     with:
@@ -203,22 +185,9 @@ jobs:
 
   security:
     name: 🛡️ Security Scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     # Run security scans in parallel with CI for faster feedback
     # Also run on schedule for periodic security checks
     if: github.event.pull_request.draft != true
-
-    steps:
-      - name: 🔐 Security Scan Information
-        run: |
-          echo "::group::Security Scan Context"
-          echo "Repository: ${{ github.repository }}"
-          echo "Branch: ${{ github.ref_name }}"
-          echo "Scan Type: Comprehensive (dependencies, code, secrets)"
-          echo "::endgroup::"
-
     # Use our centralized security scanning workflow
     uses: Stratovate-Solutions/.github/.github/workflows/reusable-security-scan.yml@main
     with:

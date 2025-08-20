@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       repositories: ${{ steps.filter.outputs.repositories }}
-      total-count: ${{ steps.filter.outputs.total-count }}
+      total_count: ${{ steps.filter.outputs.total_count }}
 
     steps:
       - name: Get organization repositories
@@ -146,7 +146,7 @@ jobs:
             console.log(`   • Eligible for protection: ${eligibleRepos.length}`);
 
             core.setOutput('repositories', JSON.stringify(eligibleRepos));
-            core.setOutput('total-count', eligibleRepos.length);
+            core.setOutput('total_count', eligibleRepos.length);
 
             return eligibleRepos;
 
@@ -157,7 +157,7 @@ jobs:
   apply-protection:
     name: 🛡️ Protect Repository
     needs: discover-repositories
-    if: ${{ needs.discover-repositories.outputs.total-count > 0 }}
+    if: ${{ needs.discover-repositories.outputs.total_count > 0 }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -247,7 +247,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const totalRepos = '${{ needs.discover-repositories.outputs.total-count }}';
+            const totalRepos = '${{ needs.discover-repositories.outputs.total_count }}';
             const isDryRun = '${{ inputs.dry-run }}' === 'true';
             const targetBranch = '${{ inputs.target-branch }}';
 

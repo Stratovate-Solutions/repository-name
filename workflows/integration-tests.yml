@@ -28,18 +28,27 @@ jobs:
             if [ -f "$template" ]; then
               echo "Testing YAML template: $template"
 
+              # Skip config.yml as it's not an issue template
+              if [[ "$(basename "$template")" == "config.yml" ]]; then
+                echo "Skipping $template (configuration file)"
+                continue
+              fi
+
               # Check if template has required fields
-              if ! yq eval '.name' "$template" >/dev/null 2>&1; then
+              name_value=$(yq eval '.name' "$template")
+              if [[ "$name_value" == "null" || -z "$name_value" ]]; then
                 echo "Error: $template missing 'name' field"
                 exit 1
               fi
 
-              if ! yq eval '.description' "$template" >/dev/null 2>&1; then
+              description_value=$(yq eval '.description' "$template")
+              if [[ "$description_value" == "null" || -z "$description_value" ]]; then
                 echo "Error: $template missing 'description' field"
                 exit 1
               fi
 
-              if ! yq eval '.body' "$template" >/dev/null 2>&1; then
+              body_value=$(yq eval '.body' "$template")
+              if [[ "$body_value" == "null" || -z "$body_value" ]]; then
                 echo "Error: $template missing 'body' field"
                 exit 1
               fi
