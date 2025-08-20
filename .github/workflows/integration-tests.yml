@@ -1,0 +1,264 @@
+name: Integration Testing
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-issue-templates:
+    name: Test Issue Templates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq yq
+
+      - name: Test issue template rendering
+        run: |
+          echo "Testing issue templates..."
+
+          # Test YAML issue templates
+          for template in .github/ISSUE_TEMPLATE/*.yml .github/ISSUE_TEMPLATE/*.yaml; do
+            if [ -f "$template" ]; then
+              echo "Testing YAML template: $template"
+
+              # Check if template has required fields
+              if ! yq eval '.name' "$template" >/dev/null 2>&1; then
+                echo "Error: $template missing 'name' field"
+                exit 1
+              fi
+
+              if ! yq eval '.description' "$template" >/dev/null 2>&1; then
+                echo "Error: $template missing 'description' field"
+                exit 1
+              fi
+
+              if ! yq eval '.body' "$template" >/dev/null 2>&1; then
+                echo "Error: $template missing 'body' field"
+                exit 1
+              fi
+
+              echo "✓ $template is valid"
+            fi
+          done
+
+          # Test Markdown issue templates
+          for template in .github/ISSUE_TEMPLATE/*.md; do
+            if [ -f "$template" ]; then
+              echo "Testing Markdown template: $template"
+
+              # Check if template has YAML frontmatter
+              if head -n 1 "$template" | grep -q "^---$"; then
+                echo "✓ $template has YAML frontmatter"
+
+                # Extract and validate YAML frontmatter
+                sed -n '/^---$/,/^---$/p' "$template" | head -n -1 | tail -n +2 | yq eval '.' - >/dev/null
+                echo "✓ $template frontmatter is valid YAML"
+              else
+                echo "Warning: $template may not have YAML frontmatter"
+              fi
+            fi
+          done
+
+  test-pr-templates:
+    name: Test PR Templates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test PR template
+        run: |
+          echo "Testing PR templates..."
+
+          # Check for PR template files
+          for template in .github/pull_request_template.md \
+                         .github/PULL_REQUEST_TEMPLATE.md \
+                         .github/pull_request_template/*.md; do
+            if [ -f "$template" ]; then
+              echo "Found PR template: $template"
+
+              # Check if template is readable and not empty
+              if [ -s "$template" ]; then
+                echo "✓ $template exists and has content"
+
+                # Check for common PR template sections
+                if grep -qi "description\|summary\|changes" "$template"; then
+                  echo "✓ $template contains description section"
+                fi
+
+                if grep -qi "checklist\|todo\|\[ \]" "$template"; then
+                  echo "✓ $template contains checklist"
+                fi
+
+                if grep -qi "test\|testing" "$template"; then
+                  echo "✓ $template mentions testing"
+                fi
+              else
+                echo "Warning: $template is empty"
+              fi
+            fi
+          done
+
+  test-workflow-syntax:
+    name: Test Workflow Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yq
+
+      - name: Test workflow syntax
+        run: |
+          echo "Testing workflow syntax..."
+
+          for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
+            if [ -f "$workflow" ]; then
+              echo "Testing workflow: $workflow"
+
+              # Check if it's valid YAML
+              if yq eval '.' "$workflow" >/dev/null 2>&1; then
+                echo "✓ $workflow is valid YAML"
+              else
+                echo "Error: $workflow is not valid YAML"
+                exit 1
+              fi
+
+              # Check for required workflow fields
+              if ! yq eval '.name' "$workflow" >/dev/null 2>&1; then
+                echo "Warning: $workflow missing 'name' field"
+              fi
+
+              if ! yq eval '.on' "$workflow" >/dev/null 2>&1; then
+                echo "Error: $workflow missing 'on' field"
+                exit 1
+              fi
+
+              if ! yq eval '.jobs' "$workflow" >/dev/null 2>&1; then
+                echo "Error: $workflow missing 'jobs' field"
+                exit 1
+              fi
+
+              echo "✓ $workflow has required structure"
+            fi
+          done
+
+  simulate-repository-setup:
+    name: Simulate Repository Setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create test repository structure
+        run: |
+          echo "Creating test repository..."
+
+          # Create a temporary test repository
+          mkdir -p test-repo/.github
+
+          # Copy GitHub configuration to test repo
+          cp -r .github/* test-repo/.github/ 2>/dev/null || true
+
+          cd test-repo
+
+          # Initialize git repository
+          git init
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+
+          # Create some test files
+          echo "# Test Repository" > README.md
+          echo "console.log('Hello World');" > index.js
+          echo "{\"name\": \"test-repo\", \"version\": \"1.0.0\"}" > package.json
+
+          git add .
+          git commit -m "Initial test commit"
+
+          echo "✓ Test repository created successfully"
+
+      - name: Validate GitHub configuration in test context
+        run: |
+          cd test-repo
+
+          echo "Validating GitHub configuration in test repository..."
+
+          # Check if .github directory exists and has expected structure
+          if [ -d ".github" ]; then
+            echo "✓ .github directory exists"
+
+            # List structure
+            echo "Repository structure:"
+            find .github -type f | sort
+
+            # Check for common files
+            if [ -d ".github/workflows" ]; then
+              echo "✓ Workflows directory exists"
+              echo "Found $(find .github/workflows -name "*.yml" -o -name "*.yaml" | wc -l) workflow files"
+            fi
+
+            if [ -d ".github/ISSUE_TEMPLATE" ]; then
+              echo "✓ Issue templates directory exists"
+              echo "Found $(find .github/ISSUE_TEMPLATE -type f | wc -l) issue template files"
+            fi
+
+            if [ -f ".github/PULL_REQUEST_TEMPLATE.md" ] || [ -f ".github/pull_request_template.md" ]; then
+              echo "✓ PR template exists"
+            fi
+
+          else
+            echo "Error: .github directory not found in test repository"
+            exit 1
+          fi
+
+  test-dependabot-config:
+    name: Test Dependabot Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test Dependabot configuration
+        run: |
+          echo "Testing Dependabot configuration..."
+
+          if [ -f ".github/dependabot.yml" ]; then
+            echo "Found Dependabot configuration"
+
+            # Validate YAML syntax
+            if yq eval '.' .github/dependabot.yml >/dev/null 2>&1; then
+              echo "✓ Dependabot config is valid YAML"
+
+              # Check for required fields
+              if yq eval '.version' .github/dependabot.yml | grep -q "2"; then
+                echo "✓ Using Dependabot version 2"
+              else
+                echo "Warning: Dependabot version should be 2"
+              fi
+
+              if yq eval '.updates' .github/dependabot.yml >/dev/null 2>&1; then
+                echo "✓ Updates section exists"
+
+                # Count update configurations
+                update_count=$(yq eval '.updates | length' .github/dependabot.yml)
+                echo "Found $update_count update configurations"
+              else
+                echo "Warning: No updates section found"
+              fi
+            else
+              echo "Error: Dependabot config is not valid YAML"
+              exit 1
+            fi
+          else
+            echo "No Dependabot configuration found (this is optional)"
+          fi

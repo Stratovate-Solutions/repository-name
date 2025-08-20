@@ -1,7 +1,7 @@
 # =============================================================================
 # Continuous Integration Workflow
 # =============================================================================
-# 
+#
 # Purpose: Automated CI/CD pipeline for code quality, testing, and security
 # Author: Stratovate Solutions DevOps Team
 # Version: 2.0
@@ -40,7 +40,7 @@ name: Continuous Integration
 # =============================================================================
 # Workflow Triggers
 # =============================================================================
-# 
+#
 # Push Events:
 # - main: Production-ready code, triggers full CI/CD pipeline
 # - develop: Integration branch for feature testing
@@ -61,7 +61,7 @@ on:
       - '**.md'           # Skip documentation-only changes
       - '.github/**.yml'  # Skip workflow-only changes (optional)
       - 'docs/**'         # Skip documentation directory changes
-  
+
   # Pull request validation
   pull_request:
     branches: [ main ]
@@ -69,7 +69,7 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-  
+
   # Manual execution capability
   workflow_dispatch:
     inputs:
@@ -91,7 +91,7 @@ on:
 # Set default permissions for GITHUB_TOKEN (principle of least privilege)
 permissions:
   contents: read          # Read repository contents
-  actions: read          # Read workflow information  
+  actions: read          # Read workflow information
   checks: write          # Write check results
   issues: write          # Comment on issues/PRs
   pull-requests: write   # Comment on PRs
@@ -102,7 +102,7 @@ env:
   # Workflow metadata
   WORKFLOW_VERSION: "2.0"
   ORGANIZATION: "Stratovate-Solutions"
-  
+
   # Build configuration
   NODE_OPTIONS: "--max-old-space-size=4096"  # Increase Node.js memory limit
   FORCE_COLOR: "1"                           # Enable colored output
@@ -116,7 +116,7 @@ jobs:
   # ---------------------------------------------------------------------------
   # Job 1: Continuous Integration
   # ---------------------------------------------------------------------------
-  # 
+  #
   # Responsibilities:
   # - Auto-detect project type (Node.js, Python, .NET, PowerShell)
   # - Install dependencies and build project
@@ -132,15 +132,15 @@ jobs:
   # - PowerShell (*.ps1, *.psm1 files)
   # - Generic (fallback for other project types)
   # ---------------------------------------------------------------------------
-  
+
   ci:
     name: 🔍 Build & Test
     runs-on: ubuntu-latest
     timeout-minutes: 30  # Prevent runaway jobs
-    
+
     # Skip CI on draft PRs (optional optimization)
     if: github.event.pull_request.draft != true
-    
+
     steps:
       - name: 📊 Workflow Information
         run: |
@@ -154,32 +154,32 @@ jobs:
           echo "Debug Mode: ${{ github.event.inputs.debug || 'false' }}"
           echo "Skip Tests: ${{ github.event.inputs.skip-tests || 'false' }}"
           echo "::endgroup::"
-    
+
     # Use our centralized reusable CI workflow
     uses: Stratovate-Solutions/.github/.github/workflows/reusable-ci.yml@main
     with:
       # Project detection and build configuration
       project-type: 'auto-detect'        # Let workflow detect project type
       node-version: '18'                  # Node.js LTS version
-      python-version: '3.11'             # Python stable version  
+      python-version: '3.11'             # Python stable version
       dotnet-version: '8.0.x'            # .NET LTS version
-      
+
       # Execution control
       run-tests: ${{ github.event.inputs.skip-tests != 'true' }}
       run-build: true
-      
+
       # Working directory (for monorepos)
       working-directory: '.'
-      
+
       # Quality and security settings
       upload-coverage: true               # Upload code coverage to GitHub
       fail-on-coverage-decrease: false    # Don't fail on coverage regression (yet)
-      
+
     secrets:
       # Package registry authentication
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-      
+
       # Additional secrets for private dependencies
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -200,16 +200,16 @@ jobs:
   # - Container image scanning (if applicable)
   # - Infrastructure as Code security analysis
   # ---------------------------------------------------------------------------
-  
+
   security:
     name: 🛡️ Security Scan
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    
+
     # Run security scans in parallel with CI for faster feedback
     # Also run on schedule for periodic security checks
     if: github.event.pull_request.draft != true
-    
+
     steps:
       - name: 🔐 Security Scan Information
         run: |
@@ -218,27 +218,27 @@ jobs:
           echo "Branch: ${{ github.ref_name }}"
           echo "Scan Type: Comprehensive (dependencies, code, secrets)"
           echo "::endgroup::"
-    
+
     # Use our centralized security scanning workflow
     uses: Stratovate-Solutions/.github/.github/workflows/reusable-security-scan.yml@main
     with:
       # Comprehensive security scanning
       scan-type: 'all'                   # Run all available security scans
-      
+
       # Scanning configuration
       include-dependencies: true         # Scan npm/pip/nuget dependencies
       include-code-analysis: true        # Static code analysis
       include-secrets: true              # Scan for exposed secrets
       include-licenses: true             # Check license compliance
-      
+
       # Severity thresholds
       fail-on-severity: 'high'           # Fail workflow on high/critical issues
       report-format: 'sarif'             # Generate SARIF report for GitHub
-      
+
     secrets:
       # Security scanning may need these for private repos
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
   # ---------------------------------------------------------------------------
   # Job 3: Build Validation Summary
   # ---------------------------------------------------------------------------
@@ -249,20 +249,20 @@ jobs:
   # - Generate build summary and notifications
   # - Set final PR check status
   # ---------------------------------------------------------------------------
-  
+
   build-summary:
     name: 📋 Build Summary
     runs-on: ubuntu-latest
     needs: [ci, security]
     if: always()  # Run even if previous jobs fail
-    
+
     steps:
       - name: 📊 Pipeline Summary
         run: |
           echo "::group::Pipeline Results"
           echo "CI Status: ${{ needs.ci.result }}"
           echo "Security Status: ${{ needs.security.result }}"
-          
+
           # Determine overall status
           if [[ "${{ needs.ci.result }}" == "success" && "${{ needs.security.result }}" == "success" ]]; then
             echo "✅ Pipeline Status: SUCCESS"
@@ -276,7 +276,7 @@ jobs:
             echo "Some checks were skipped or cancelled."
           fi
           echo "::endgroup::"
-          
+
       - name: 💬 PR Comment (on failure)
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
@@ -287,17 +287,17 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `## 🚨 CI Pipeline Failed
-              
+
               The continuous integration pipeline has failed. Please check the following:
-              
+
               - **CI Build**: ${{ needs.ci.result }}
               - **Security Scan**: ${{ needs.security.result }}
-              
+
               ### Next Steps:
               1. Review the failed job logs above
               2. Fix any identified issues
               3. Push your changes to re-trigger the pipeline
-              
+
               For help, check our [Contributing Guide](../CONTRIBUTING.md) or contact the DevOps team.
               `
             })

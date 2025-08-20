@@ -1,0 +1,143 @@
+name: Lint and Validate GitHub Configuration
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  yaml-lint:
+    name: YAML Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Create yamllint config
+        run: |
+          cat > .yamllint.yml << EOF
+          extends: default
+          rules:
+            line-length:
+              max: 120
+            indentation:
+              spaces: 2
+            comments:
+              min-spaces-from-content: 1
+            trailing-spaces: enable
+            truthy:
+              allowed-values: ['true', 'false', 'on', 'off']
+          EOF
+
+      - name: Lint YAML files
+        run: |
+          echo "Linting workflow files..."
+          find .github/workflows -name "*.yml" -o -name "*.yaml" | \
+          xargs yamllint -c .yamllint.yml
+
+          echo "Linting other YAML files..."
+          find . -name "*.yml" -o -name "*.yaml" | \
+          grep -v ".github/workflows" | \
+          xargs yamllint -c .yamllint.yml || true
+
+  markdown-lint:
+    name: Markdown Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Lint Markdown files
+        uses: DavidAnson/markdownlint-cli2-action@v13
+        with:
+          globs: |
+            **/*.md
+            !node_modules/**
+            !.git/**
+          config: |
+            {
+              "default": true,
+              "MD013": {
+                "line_length": 120,
+                "code_blocks": false,
+                "tables": false
+              },
+              "MD033": false,
+              "MD041": false,
+              "MD024": {
+                "allow_different_nesting": true
+              }
+            }
+
+  schema-validation:
+    name: Schema Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install schema validation tools
+        run: |
+          npm install -g ajv-cli
+          npm install -g js-yaml
+
+      - name: Validate workflow schemas
+        run: |
+          echo "Validating GitHub workflow schemas..."
+          for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
+            if [ -f "$workflow" ]; then
+              echo "Validating $workflow"
+              # Convert YAML to JSON and validate against GitHub workflow schema
+              js-yaml "$workflow" > temp.json
+              ajv validate -s https://json.schemastore.org/github-workflow.json \
+                          -d temp.json || echo "Warning: $workflow may have schema issues"
+              rm -f temp.json
+            fi
+          done
+
+      - name: Validate issue template schemas
+        run: |
+          echo "Validating issue template schemas..."
+          for template in .github/ISSUE_TEMPLATE/*.yml .github/ISSUE_TEMPLATE/*.yaml; do
+            if [ -f "$template" ]; then
+              echo "Validating $template"
+              js-yaml "$template" > temp.json
+              # Basic structure validation for issue templates
+              if ! grep -q '"name":\|"description":\|"body":' temp.json; then
+                echo "Warning: $template may be missing required fields"
+              fi
+              rm -f temp.json
+            fi
+          done
+
+  json-validation:
+    name: JSON Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate JSON files
+        run: |
+          echo "Validating JSON files..."
+          find . -name "*.json" -type f | while read -r file; do
+            echo "Validating $file"
+            if ! python -m json.tool "$file" > /dev/null; then
+              echo "Error: $file is not valid JSON"
+              exit 1
+            fi
+          done

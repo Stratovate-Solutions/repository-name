@@ -9,7 +9,7 @@ Thank you for using Stratovate Solutions projects! This document explains how to
 Before reaching out for help, please check our documentation:
 
 - **Project README**: Start with the README.md in each repository
-- **Documentation Site**: [docs.stratovate.com](https://docs.stratovate.com)
+- **Documentation Site**: [docs.stratovate-solutions.com](https://docs.stratovate-solutions.com)
 - **API Documentation**: Available for projects with APIs
 - **Troubleshooting Guides**: Common issues and solutions
 
@@ -46,7 +46,7 @@ For enterprise customers and commercial support:
 - **SLA Guarantees**: Service level agreements
 - **Security Updates**: Priority security patches
 
-**Contact**: <enterprise@stratovate.com>
+**Contact**: <support@stratovate-solutions.com>
 
 ## 📋 Support Scope
 
@@ -150,7 +150,7 @@ For bug reports:
 |------|---------|---------------|
 | General Support | <support@stratovate-solutions.com> | 2-5 business days |
 | Security Issues | <security@stratovate-solutions.com> | 24-72 hours |
-| Enterprise Sales | <enterprise@stratovate-solutions.com> | 1-2 business days |
+| Enterprise Sales | <sales@stratovate-solutions.com> | 1-2 business days |
 | Partnership | <partnerships@stratovate-solutions.com> | 3-5 business days |
 
 ## 🆔 Support Ticket Priority

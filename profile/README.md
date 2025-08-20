@@ -46,8 +46,8 @@ At Stratovate Solutions, we specialize in transforming how organizations communi
 
 ## 🤝 Connect With Us
 
-- 🌐 **Website**: [stratovate.com](https://stratovate.com)
-- 📧 **Email**: [info@stratovate.com](mailto:info@stratovate.com)
+- 🌐 **Website**: [stratovate-solutions.com](https://stratovate-solutions.com)
+- 📧 **Email**: [info@stratovate-solutions.com](mailto:info@stratovate-solutions.com)
 - 💼 **LinkedIn**: [Stratovate Solutions](https://linkedin.com/company/stratovate-solutions)
 - 🐦 **Twitter**: [@StratovateSol](https://twitter.com/StratovateSol)
 

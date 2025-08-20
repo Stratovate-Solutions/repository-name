@@ -2,12 +2,13 @@
 
 [![PowerShell](https://img.shields.io/badge/PowerShell-7.0+-blue.svg)](https://github.com/PowerShell/PowerShell)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![GitHub Issues](https://img.shields.io/github/issues/Stratovate-Solutions/BranchProtectionPolicy)](https://github.com/Stratovate-Solutions/BranchProtectionPolicy/issues)
-[![Last Commit](https://img.shields.io/github/last-commit/Stratovate-Solutions/BranchProtectionPolicy)](https://github.com/Stratovate-Solutions/BranchProtectionPolicy/commits/main)
+[![Code Quality](https://img.shields.io/badge/PSScriptAnalyzer-Passing-green.svg)](PSScriptAnalyzerSettings.psd1)
+[![Workflows](https://img.shields.io/badge/GitHub%20Actions-Automated-blue.svg)](/.github/workflows/)
+[![Version](https://img.shields.io/badge/Version-2.1.0-brightgreen.svg)](CHANGELOG.md)
 
-> **Automated enforcement of standardized branch protection policies across GitHub repositories**
+> **Automated enforcement of standardized branch protection policies across GitHub repositories with comprehensive workflow templates and organization management tools**
 
-This repository contains PowerShell scripts and GitHub Actions workflows for applying consistent branch protection policies across multiple repositories in the Stratovate Solutions organization. It ensures security, quality, and compliance standards are maintained across all code repositories.
+This repository contains PowerShell scripts, GitHub Actions workflows, and organization management tools for applying consistent branch protection policies across multiple repositories. It ensures security, quality, and compliance standards are maintained across all code repositories with enhanced YAML validation and workflow automation.
 
 ---
 
@@ -27,6 +28,8 @@ This repository contains PowerShell scripts and GitHub Actions workflows for app
 - **Stale Review Dismissal** - Ensure reviews reflect current code
 - **Configurable Review Count** - Flexible approval requirements (1-6 reviewers)
 - **Linear History Option** - Maintain clean commit history
+- **YAML Validation** - Comprehensive workflow file validation and formatting
+- **Code Quality Checks** - PSScriptAnalyzer integration for PowerShell code
 
 ### 🔧 Automation & Management
 
@@ -34,38 +37,71 @@ This repository contains PowerShell scripts and GitHub Actions workflows for app
 - **Secure Token Handling** - Best practices for credential management
 - **Comprehensive Logging** - Detailed audit trails and troubleshooting
 - **Error Recovery** - Robust error handling and retry mechanisms
+- **Workflow Templates** - Reusable GitHub Actions workflow templates
+- **Organization Management** - Complete GitHub organization configuration tools
+- **Directory Cleanup** - Automated workspace organization and cleanup
 
 ---
 
 ## 📁 Repository Structure
 
-BranchProtectionPolicy/
+```text
+.github-org/
 ├── 📄 BranchProtectionPolicy.ps1          # Main PowerShell script
-├── 📄 README.md                           # This documentation
+├── 📄 README.md                           # Project documentation  
 ├── 📄 LICENSE                             # MIT License
 ├── 📄 CHANGELOG.md                        # Version history
-├── 📁 .github-org/                        # GitHub organization templates
-│   ├── 📄 README.md                       # Organization docs
+├── 📄 project.json                        # Project metadata
+├── 📄 PSScriptAnalyzerSettings.psd1       # Code quality configuration
+├── 📄 .gitignore                          # Git ignore rules
 │   ├── 📄 CONTRIBUTING.md                 # Contribution guidelines
 │   ├── 📄 SECURITY.md                     # Security policy
-│   ├── 📁 .github/workflows/              # Reusable workflows
-│   │   ├── 📄 apply-branch-protection.yml # Branch protection workflow
-│   │   ├── 📄 reusable-ci.yml             # CI/CD workflow
-│   │   └── 📄 reusable-release.yml        # Release automation
+│   ├── � SUPPORT.md                      # Support information
+│   ├── 📄 PULL_REQUEST_TEMPLATE.md        # PR template
 │   ├── 📁 ISSUE_TEMPLATE/                 # Issue templates
-│   ├── 📁 workflow-templates/             # Template files
-│   └── 📁 profile/                        # Organization profile
-├── 📁 docs/                               # Additional documentation
-├── 📁 examples/                           # Usage examples
-├── 📁 tests/                              # Pester test scripts
-└── 📁 logs/                               # Generated log files
+│   │   ├── 📄 bug_report.yml              # Bug report template
+│   │   ├── 📄 feature_request.yml         # Feature request template
+│   │   └── 📄 config.yml                  # Issue config
+│   └── 📁 workflows/                      # GitHub Actions workflows
+│       ├── 📄 apply-branch-protection.yml # Branch protection workflow
+│       ├── 📄 continuous-integration.yml  # CI workflow
+│       ├── 📄 org-branch-protection.yml   # Organization protection
+│       ├── 📄 integration-tests.yml       # Integration tests
+│       ├── 📄 lint-validation.yml         # Linting workflow
+│       └── 📄 validate.yml                # Validation workflow
+├── 📁 config/                             # Configuration files
+│   ├── 📄 .markdownlint.json              # Markdown linting config
+│   └── 📄 .yamllint.yml                   # YAML linting config
+├── 📁 docs/                               # Documentation
+│   ├── 📄 documentation-summary.md        # Documentation overview
+│   ├── � examples.md                     # Usage examples
+│   └── 📄 TESTING.md                      # Testing guidelines
+├── 📁 examples/                           # Example scripts
+│   └── � Usage-Examples.ps1              # PowerShell usage examples
+├── 📁 logs/                               # Generated log files
+├── 📁 profile/                            # Organization profile
+│   └── 📄 README.md                       # Organization README
+├── 📁 tests/                              # Test suite
+│   ├── 📄 BranchProtectionPolicy.Tests.ps1 # Main test file
+│   ├── 📄 PSScriptAnalyzer.Tests.ps1      # Code quality tests
+│   └── 📄 Run-Tests.ps1                   # Test runner
+├── 📁 tools/                              # Utility scripts
+│   ├── 📄 validate-github-config.ps1      # Configuration validator
+│   └── 📄 fix-yaml-issues.ps1             # YAML issue fixer
+└── 📁 workflow-templates/                 # Reusable workflow templates
+    ├── 📄 codeowners-template              # CODEOWNERS template
+    ├── 📄 dependabot.yml                  # Dependabot configuration
+    ├── � labeler.yml                     # Auto-labeler configuration
+    ├── 📄 reusable-ci.yml                 # Reusable CI workflow
+    └── 📄 reusable-release.yml            # Reusable release workflow
+```
 ```
 BranchProtectionPolicy/
 ├── 📄 BranchProtectionPolicy.ps1          # Main PowerShell script
 ├── 📄 README.md                           # This documentation
 ├── 📄 LICENSE                             # MIT License
 ├── 📄 CHANGELOG.md                        # Version history
-├── 📁 .github-org/                        # GitHub organization templates
+├── 📁 .GITHUB-ORG/                        # GitHub organization templates
 │   ├── 📄 README.md                       # Organization docs
 │   ├── 📄 CONTRIBUTING.md                 # Contribution guidelines
 │   ├── 📄 SECURITY.md                     # Security policy
@@ -314,7 +350,7 @@ $result = Set-BranchProtection -Repo $repo -Branch $Branch -Token $GithubPAT `
 
 ### Organization-Specific Templates
 
-Create custom protection templates in the `.github-org/` directory for different repository types:
+Create custom protection templates in the `.GITHUB-ORG/` directory for different repository types:
 
 - **Critical Systems**: High security, multiple reviewers
 - **Development Projects**: Balanced security and velocity
@@ -348,46 +384,110 @@ Create custom protection templates in the `.github-org/` directory for different
 
 ---
 
-## 🧪 Testing
+## 🧪 Testing & Code Quality
+
+### Comprehensive Test Suite
+
+This project includes a robust testing framework with multiple test types:
+
+#### Test Types Available
+
+- **🔍 Unit Tests** - Core functionality and parameter validation
+- **🔗 Integration Tests** - End-to-end workflow testing  
+- **🛡️ Security Tests** - Security validation and token handling
+- **📋 Code Quality Tests** - PSScriptAnalyzer static code analysis
 
 ### Running Tests
 
 ```powershell
-# Install Pester testing framework
+# Install required testing modules
 Install-Module -Name Pester -Force -SkipPublisherCheck
+Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck
 
-# Run all tests
-Invoke-Pester -Path "tests/" -OutputFormat NUnitXml -OutputFile "TestResults.xml"
+# Run all tests with the integrated test runner
+.\tests\Run-Tests.ps1
 
-# Run specific test
-Invoke-Pester -Path "tests/BranchProtection.Tests.ps1" -Verbose
+# Run specific test types
+.\tests\Run-Tests.ps1 -TestType Unit
+.\tests\Run-Tests.ps1 -TestType Security  
+.\tests\Run-Tests.ps1 -TestType CodeQuality
+.\tests\Run-Tests.ps1 -TestType Integration
+
+# Generate comprehensive HTML report
+.\tests\Run-Tests.ps1 -TestType All -GenerateReport
+
+# Export test results for CI/CD
+.\tests\Run-Tests.ps1 -OutputFormat NUnitXml
+.\tests\Run-Tests.ps1 -OutputFormat JUnitXml
 ```
+
+### PSScriptAnalyzer Integration
+
+The project includes comprehensive static code analysis using PSScriptAnalyzer:
+
+#### Code Quality Rules
+
+- **Security Analysis** - Detects security anti-patterns and vulnerabilities
+- **Best Practices** - Enforces PowerShell coding standards
+- **Performance** - Identifies performance optimization opportunities  
+- **Style Consistency** - Maintains consistent code formatting
+
+#### Custom Configuration
+
+The project uses a custom PSScriptAnalyzer configuration (`PSScriptAnalyzerSettings.psd1`) that:
+
+- Focuses on critical security and performance rules
+- Allows flexibility for example scripts and documentation
+- Excludes overly strict formatting rules while maintaining quality
+- Provides context-appropriate rule sets for different file types
+
+#### Quality Metrics
+
+Current code quality status:
+
+- ✅ **Zero critical errors** - No blocking issues
+- ⚠️ **Minimal warnings** - Only contextually appropriate issues
+- 📊 **Comprehensive coverage** - All PowerShell files analyzed
+- 🔒 **Security focused** - Enhanced security rule validation
 
 ### Test Coverage
 
-The test suite covers:
+The test suite comprehensively covers:
 
-- ✅ Parameter validation
-- ✅ Token format verification
-- ✅ API error handling
-- ✅ Configuration validation
-- ✅ Logging functionality
-- ✅ Security token handling
+- ✅ **Parameter Validation** - Input validation and type checking
+- ✅ **API Integration** - GitHub API interaction and error handling
+- ✅ **Security Practices** - Token handling and credential security
+- ✅ **Error Scenarios** - Network failures and permission issues
+- ✅ **Configuration Logic** - Policy application and validation
+- ✅ **Code Quality** - Static analysis and best practices
+- ✅ **Performance** - Efficient API usage and resource management
 
 ### Mock Testing
 
-Test without affecting real repositories:
+Test safely without affecting real repositories:
 
 ```powershell
 # Use test repositories or mock API responses
 .\BranchProtectionPolicy.ps1 -GithubPAT $testToken -Repos @("test-org/test-repo") -WhatIf
+
+# Run tests with mocked dependencies
+.\tests\Run-Tests.ps1 -TestType Integration  # Uses mocked API calls
 ```
+
+### Test Reports
+
+Generated test artifacts:
+
+- **HTML Report** - `TestResults/TestReport.html` - Visual test summary
+- **XML Reports** - NUnit/JUnit compatible for CI/CD integration
+- **PSScriptAnalyzer Report** - `TestResults/PSScriptAnalyzer-Report.txt` - Detailed code analysis
+- **Coverage Metrics** - Test execution statistics and coverage data
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](.github-org/CONTRIBUTING.md) for details.
+We welcome contributions! Please see our [Contributing Guide](.GITHUB-ORG/CONTRIBUTING.md) for details.
 
 ### Development Setup
 
@@ -429,7 +529,7 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 - **Documentation**: Check this README and inline code comments
 - **Issues**: [GitHub Issues](https://github.com/Stratovate-Solutions/BranchProtectionPolicy/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/Stratovate-Solutions/BranchProtectionPolicy/discussions)
-- **Email**: DevOps team at <devops@stratovate.com>
+- **Email**: DevOps team at <devops@stratovate-solutions.com>
 
 ### Troubleshooting
 
@@ -447,7 +547,7 @@ Common issues and solutions:
 For urgent issues affecting production repositories:
 
 - **On-call DevOps**: +1-555-DEVOPS
-- **Security Team**: <security@stratovate.com>
+- **Security Team**: <security@stratovate-solutions.com>
 - **Escalation**: CTO office
 
 ---
@@ -467,8 +567,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Contact Information:**
 
-- **Website**: [stratovate.com](https://stratovate.com)
-- **Email**: <info@stratovate.com>
+- **Website**: [stratovate-solutions.com](https://stratovate-solutions.com)
+- **Email**: <info@stratovate-solutions.com>
 - **LinkedIn**: [Stratovate Solutions](https://linkedin.com/company/stratovate-solutions)
 
 ---

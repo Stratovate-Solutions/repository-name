@@ -1,7 +1,7 @@
 {
   "name": "github-branch-protection-policy",
-  "version": "2.0.0",
-  "description": "Automated enforcement of standardized branch protection policies across GitHub repositories",
+  "version": "2.1.0",
+  "description": "Automated enforcement of standardized branch protection policies across GitHub repositories with comprehensive workflow templates and organization configuration management",
   "main": "BranchProtectionPolicy.ps1",
   "scripts": {
     "test": "Invoke-Pester -Path './tests/' -OutputFormat NUnitXml -OutputFile 'TestResults.xml'",
@@ -24,24 +24,28 @@
     "compliance",
     "repository-management",
     "ci-cd",
-    "github-api"
+    "github-api",
+    "workflow-templates",
+    "organization-management",
+    "yaml-validation",
+    "code-quality"
   ],
   "author": {
     "name": "Stratovate Solutions DevOps Team",
-    "email": "devops@stratovate.com",
-    "url": "https://stratovate.com"
+    "email": "devops@stratovate-solutions.com",
+    "url": "https://stratovate-solutions.com"
   },
   "contributors": [
     {
       "name": "Jeffrey LeBlanc",
-      "email": "jeffrey.leblanc@stratovate.com",
+      "email": "jeffrey.leblanc@stratovate-solutions.com",
       "role": "Lead Developer"
     }
   ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/Stratovate-Solutions/BranchProtectionPolicy/issues",
-    "email": "devops@stratovate.com"
+    "email": "devops@stratovate-solutions.com"
   },
   "homepage": "https://github.com/Stratovate-Solutions/BranchProtectionPolicy#readme",
   "documentation": {

@@ -2,7 +2,7 @@
 # Reusable CI Workflow
 # =============================================================================
 #
-# Purpose: Multi-language continuous integration workflow for automated 
+# Purpose: Multi-language continuous integration workflow for automated
 #          building, testing, and quality assurance
 # Author: Stratovate Solutions DevOps Team
 # Version: 2.0
@@ -75,13 +75,13 @@ on:
       # -------------------------------------------------------------------------
       # Language Runtime Versions
       # -------------------------------------------------------------------------
-      
+
       node-version:
         description: |
           Node.js version to use for JavaScript/TypeScript projects.
           Supports specific versions (18.16.0) or ranges (18.x, 18).
           Default: '18' (Current LTS)
-          
+
           Common Versions:
           - '18' (LTS - Recommended for production)
           - '20' (Current - Latest features)
@@ -89,13 +89,13 @@ on:
         required: false
         default: '18'
         type: string
-        
+
       python-version:
         description: |
           Python version for Python projects.
           Supports specific versions (3.11.2) or ranges (3.11.x).
           Default: '3.11' (Stable with good performance)
-          
+
           Common Versions:
           - '3.11' (Recommended - Best performance)
           - '3.10' (Stable - Wide compatibility)
@@ -103,13 +103,13 @@ on:
         required: false
         default: '3.11'
         type: string
-        
+
       dotnet-version:
         description: |
           .NET version for C#/F#/VB.NET projects.
           Supports specific versions (8.0.100) or ranges (8.0.x).
           Default: '8.0.x' (Latest LTS)
-          
+
           Common Versions:
           - '8.0.x' (LTS - Recommended for new projects)
           - '6.0.x' (LTS - Legacy support until Nov 2024)
@@ -117,11 +117,11 @@ on:
         required: false
         default: '8.0.x'
         type: string
-      
+
       # -------------------------------------------------------------------------
       # Execution Control Parameters
       # -------------------------------------------------------------------------
-      
+
       run-tests:
         description: |
           Execute test suites during CI pipeline.
@@ -131,7 +131,7 @@ on:
         required: false
         default: true
         type: boolean
-        
+
       run-build:
         description: |
           Execute build/compilation steps.
@@ -141,13 +141,13 @@ on:
         required: false
         default: true
         type: boolean
-        
+
       working-directory:
         description: |
           Working directory for all CI operations.
           Useful for monorepos where project is in subdirectory.
           Default: '.' (repository root)
-          
+
           Examples:
           - '.' (repository root)
           - 'src/frontend' (frontend in subdirectory)
@@ -155,17 +155,17 @@ on:
         required: false
         default: '.'
         type: string
-      
+
       # -------------------------------------------------------------------------
       # Project Detection and Configuration
       # -------------------------------------------------------------------------
-      
+
       project-type:
         description: |
           Override automatic project type detection.
           When 'auto-detect', workflow analyzes repository files.
           Use specific type to force particular CI pipeline.
-          
+
           Supported Types:
           - 'auto-detect' (analyze repository files)
           - 'node' (JavaScript/TypeScript with npm/yarn)
@@ -176,11 +176,11 @@ on:
         required: false
         default: 'auto-detect'
         type: string
-      
+
       # -------------------------------------------------------------------------
       # Quality and Coverage Configuration
       # -------------------------------------------------------------------------
-      
+
       upload-coverage:
         description: |
           Upload code coverage reports to GitHub.
@@ -190,7 +190,7 @@ on:
         required: false
         default: true
         type: boolean
-        
+
       fail-on-coverage-decrease:
         description: |
           Fail CI if code coverage decreases from main branch.
@@ -200,11 +200,11 @@ on:
         required: false
         default: false
         type: boolean
-    
+
     # -------------------------------------------------------------------------
     # Required Secrets for Private Dependencies
     # -------------------------------------------------------------------------
-    
+
     secrets:
       NPM_TOKEN:
         description: |
@@ -213,14 +213,14 @@ on:
           - Private npm registries
           - GitHub Package Registry (@scope/package)
           - Organization-specific package feeds
-          
+
           Token Scopes:
           - read:packages (minimum for private packages)
           - write:packages (for publishing)
-          
+
           Security Note: Store in repository or organization secrets
         required: false
-        
+
       NUGET_API_KEY:
         description: |
           NuGet API key for private package access.
@@ -228,10 +228,10 @@ on:
           - Private NuGet feeds
           - Azure Artifacts
           - GitHub Package Registry
-          
+
           Security Note: Use encrypted secrets and rotate regularly
         required: false
-      
+
       GITHUB_TOKEN:
         description: |
           GitHub token for API access and package registry.
@@ -240,7 +240,7 @@ on:
           - GitHub Package Registry access
           - API calls for coverage reporting
           - Workflow status updates
-          
+
           Note: Automatically available, typically don't need to pass explicitly
         required: false
 
@@ -260,12 +260,12 @@ env:
   # Workflow identification
   WORKFLOW_NAME: "Reusable CI"
   WORKFLOW_VERSION: "2.0"
-  
+
   # Build optimization
   NODE_OPTIONS: "--max-old-space-size=4096"
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
-  
+
   # Quality and debugging
   FORCE_COLOR: "1"
   CI: true
@@ -285,15 +285,15 @@ jobs:
   #
   # Responsibility: Analyze repository structure to determine project type
   # This enables the workflow to automatically select appropriate CI pipeline
-  # 
+  #
   # Detection Logic:
   # - package.json → Node.js project
-  # - requirements.txt or pyproject.toml → Python project  
+  # - requirements.txt or pyproject.toml → Python project
   # - *.csproj or *.sln → .NET project
   # - *.ps1 or *.psm1 → PowerShell project
   # - Default → Generic project
   # ---------------------------------------------------------------------------
-  
+
   detect-project-type:
     name: 🔍 Detect Project Type
     runs-on: ubuntu-latest
@@ -303,7 +303,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Detect project type
         id: detect
         run: |
@@ -328,23 +328,23 @@ jobs:
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
-      
+
       - name: Install dependencies
         run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      
+
       - name: Run linting
         run: |
           if npm run lint --if-present; then
@@ -353,7 +353,7 @@ jobs:
             echo "No lint script found or linting failed"
             exit 1
           fi
-      
+
       - name: Run tests
         if: ${{ inputs.run-tests }}
         run: |
@@ -362,7 +362,7 @@ jobs:
           else
             echo "No test script found"
           fi
-      
+
       - name: Build project
         if: ${{ inputs.run-build }}
         run: |
@@ -379,29 +379,29 @@ jobs:
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ inputs.python-version }}
           cache: 'pip'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-      
+
       - name: Run linting with flake8
         run: |
           pip install flake8
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-      
+
       - name: Run tests with pytest
         if: ${{ inputs.run-tests }}
         run: |
@@ -415,23 +415,23 @@ jobs:
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
-      
+
       - name: Restore dependencies
         run: dotnet restore
-      
+
       - name: Build
         if: ${{ inputs.run-build }}
         run: dotnet build --no-restore --configuration Release
-      
+
       - name: Run tests
         if: ${{ inputs.run-tests }}
         run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
@@ -443,11 +443,11 @@ jobs:
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
@@ -457,7 +457,7 @@ jobs:
             $results | Format-Table
             throw "PSScriptAnalyzer found issues"
           }
-      
+
       - name: Run Pester tests
         if: ${{ inputs.run-tests }}
         shell: pwsh

@@ -8,29 +8,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Comprehensive documentation and inline comments
-- Enhanced error handling with specific troubleshooting guidance
-- Secure token storage examples and best practices
-- CSV export functionality for audit trails
-- GitHub Actions workflow integration
-- Organization-wide policy templates
+
+- Comprehensive YAML workflow validation and formatting
+- Enhanced GitHub Actions templates with improved error handling
+- Organization-wide policy management tools
+- Workflow template repository structure for easy deployment
+- YAML linting and validation automation
+- Directory cleanup automation with comprehensive reporting
 
 ### Changed
-- Upgraded to PowerShell 7.0+ requirements
-- Enhanced API error handling with specific status code responses
-- Improved logging with structured output and file generation
-- Updated to use Bearer token authentication format
-- Enhanced parameter validation with descriptive error messages
+
+- Improved YAML formatting across all workflow files to meet line length requirements
+- Enhanced workflow readability with proper line breaks and continuation
+- Updated workflow templates for better maintainability
+- Refined project structure for improved organization
+
+### Fixed
+
+- YAML line length issues in workflow files (Issue #YAML-001)
+- Long command formatting in GitHub Actions workflows
+- Workflow file validation errors
+- Directory structure inconsistencies
 
 ### Security
-- Added secure credential storage mechanisms
-- Implemented token format validation
-- Enhanced audit logging capabilities
-- Added rate limiting between API requests
 
-## [2.0.0] - 2025-08-19
+- Enhanced workflow security with improved token handling
+- Added validation for workflow inputs and parameters
+- Improved error handling in security-sensitive operations
 
-### Added
+## [2.1.0] - 2025-08-20
+
+### Added - Version 2.1.0
+
 - **Comprehensive Documentation**: Added detailed inline comments, parameter documentation, and usage examples
 - **Enhanced Security**: Secure token handling with encrypted storage options
 - **Advanced Error Handling**: Detailed error diagnostics with troubleshooting suggestions
@@ -41,20 +50,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Status Check Support**: Configurable required status checks for CI/CD integration
 - **Flexible Configuration**: Customizable review requirements and protection settings
 
-### Changed
+### Changed - Version 2.1.0
+
 - **PowerShell 7.0+ Requirement**: Updated for modern PowerShell features and cross-platform compatibility
 - **Bearer Token Authentication**: Updated to use modern GitHub API authentication
 - **API Version Specification**: Added explicit API version for consistency
 - **Enhanced Output**: Improved console output with color coding and progress indicators
 - **Function Restructure**: Modularized code with proper function separation and documentation
 
-### Fixed
+### Fixed - Version 2.1.0
+
 - **Rate Limiting**: Added delays between API requests to respect GitHub API limits
 - **Error Recovery**: Improved error handling with retry logic for transient failures
 - **Token Validation**: Added token format validation before API calls
 - **Repository Validation**: Enhanced repository name format validation
 
-### Security
+### Security - Version 2.1.0
+
 - **Secure Storage**: Added examples for secure token storage using Windows credential systems
 - **Minimal Permissions**: Updated token requirements to use minimal necessary scopes
 - **Audit Trail**: Comprehensive logging for security compliance and auditing
@@ -136,7 +148,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 For questions about specific versions or migration assistance:
 
 - **Current Version Issues**: [GitHub Issues](https://github.com/Stratovate-Solutions/BranchProtectionPolicy/issues)
-- **Migration Help**: Contact DevOps team at devops@stratovate.com
+- **Migration Help**: Contact DevOps team at devops@stratovate-solutions.com
 - **Feature Requests**: [GitHub Discussions](https://github.com/Stratovate-Solutions/BranchProtectionPolicy/discussions)
 
 ---

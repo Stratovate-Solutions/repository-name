@@ -22,7 +22,7 @@ We take security seriously at Stratovate Solutions. This section outlines which 
    - Fill out the advisory form
 
 2. **Email**
-   - Send details to: <security@stratovate.com>
+   - Send details to: <security@stratovate-solutions.com>
    - Include "SECURITY" in the subject line
 
 3. **Private Communication**
@@ -96,8 +96,8 @@ We use various tools to maintain security:
 
 ## Contact Information
 
-- **Security Team**: <security@stratovate.com>
-- **General Contact**: <support@stratovate.com>
+- **Security Team**: <security@stratovate-solutions.com>
+- **General Contact**: <support@stratovate-solutions.com>
 - **Emergency**: Use GitHub Security Advisories for fastest response
 
 ## Legal

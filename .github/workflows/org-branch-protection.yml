@@ -1,0 +1,291 @@
+# =============================================================================
+# Organization-Wide Branch Protection Pipeline
+# =============================================================================
+#
+# Purpose: Apply standardized branch protection policies across all repositories
+# Author: Stratovate Solutions DevOps Team
+# Version: 2.0
+# Last Updated: 2025-08-19
+#
+# This workflow orchestrates the application of branch protection policies
+# across all repositories in the Stratovate Solutions organization.
+# =============================================================================
+
+name: Organization Branch Protection
+
+on:
+  workflow_dispatch:
+    inputs:
+      target-branch:
+        description: 'Branch to protect (default: main)'
+        required: false
+        default: 'main'
+        type: string
+      required-reviewers:
+        description: 'Number of required reviewers (1-6)'
+        required: false
+        default: '2'
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+          - '4'
+          - '5'
+          - '6'
+      enforce-admins:
+        description: 'Apply protection to admins'
+        required: false
+        default: true
+        type: boolean
+      dry-run:
+        description: 'Preview changes without applying'
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC to ensure compliance
+    - cron: '0 2 * * 0'
+
+env:
+  ORGANIZATION: 'Stratovate-Solutions'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Repository Discovery and Filtering
+  # ---------------------------------------------------------------------------
+
+  discover-repositories:
+    name: 🔍 Discover Repositories
+    runs-on: ubuntu-latest
+    outputs:
+      repositories: ${{ steps.filter.outputs.repositories }}
+      total-count: ${{ steps.filter.outputs.total-count }}
+
+    steps:
+      - name: Get organization repositories
+        id: repos
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const org = process.env.ORGANIZATION;
+            console.log(`🔍 Discovering repositories in ${org}...`);
+
+            try {
+              const repos = await github.paginate(github.rest.repos.listForOrg, {
+                org: org,
+                type: 'all',
+                sort: 'updated',
+                per_page: 100
+              });
+
+              console.log(`📋 Found ${repos.length} total repositories`);
+              return repos;
+
+            } catch (error) {
+              console.error(`❌ Failed to fetch repositories: ${error.message}`);
+              throw error;
+            }
+
+      - name: Filter and validate repositories
+        id: filter
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const allRepos = ${{ steps.repos.outputs.result }};
+            const targetBranch = '${{ inputs.target-branch }}';
+            const eligibleRepos = [];
+
+            console.log(`🔍 Filtering repositories for branch protection...`);
+            console.log(`🎯 Target branch: ${targetBranch}`);
+
+            for (const repo of allRepos) {
+              // Skip archived repositories
+              if (repo.archived) {
+                console.log(`⏭️ Skipping archived: ${repo.full_name}`);
+                continue;
+              }
+
+              // Skip forks unless they're actively maintained
+              if (repo.fork && !repo.pushed_at > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) {
+                console.log(`⏭️ Skipping inactive fork: ${repo.full_name}`);
+                continue;
+              }
+
+              // Check if target branch exists
+              try {
+                await github.rest.repos.getBranch({
+                  owner: repo.owner.login,
+                  repo: repo.name,
+                  branch: targetBranch
+                });
+
+                eligibleRepos.push({
+                  name: repo.full_name,
+                  default_branch: repo.default_branch,
+                  private: repo.private,
+                  size: repo.size,
+                  updated_at: repo.updated_at
+                });
+
+                console.log(`✅ Eligible: ${repo.full_name} (${targetBranch} exists)`);
+
+              } catch (error) {
+                if (error.status === 404) {
+                  console.log(`⏭️ Skipping ${repo.full_name}: ${targetBranch} branch not found`);
+                } else {
+                  console.log(`⚠️ Error checking ${repo.full_name}: ${error.message}`);
+                }
+              }
+            }
+
+            console.log(`\n📊 Summary:`);
+            console.log(`   • Total repositories: ${allRepos.length}`);
+            console.log(`   • Eligible for protection: ${eligibleRepos.length}`);
+
+            core.setOutput('repositories', JSON.stringify(eligibleRepos));
+            core.setOutput('total-count', eligibleRepos.length);
+
+            return eligibleRepos;
+
+  # ---------------------------------------------------------------------------
+  # Branch Protection Application (Matrix Strategy)
+  # ---------------------------------------------------------------------------
+
+  apply-protection:
+    name: 🛡️ Protect Repository
+    needs: discover-repositories
+    if: ${{ needs.discover-repositories.outputs.total-count > 0 }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      max-parallel: 5  # Limit concurrent API calls
+      fail-fast: false  # Continue even if some repositories fail
+      matrix:
+        repository: ${{ fromJSON(needs.discover-repositories.outputs.repositories) }}
+
+    steps:
+      - name: 📋 Repository Information
+        run: |
+          echo "::group::Repository Details"
+          echo "Repository: ${{ matrix.repository.name }}"
+          echo "Default Branch: ${{ matrix.repository.default_branch }}"
+          echo "Target Branch: ${{ inputs.target-branch }}"
+          echo "Private: ${{ matrix.repository.private }}"
+          echo "Size: ${{ matrix.repository.size }} KB"
+          echo "Last Updated: ${{ matrix.repository.updated_at }}"
+          echo "::endgroup::"
+
+      - name: 🛡️ Apply Branch Protection
+        if: ${{ !inputs.dry-run }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = '${{ env.ORGANIZATION }}';
+            const repo = '${{ matrix.repository.name }}';
+            const branch = '${{ inputs.target-branch }}';
+            const requiredReviewers = parseInt('${{ inputs.required-reviewers }}');
+            const enforceAdmins = '${{ inputs.enforce-admins }}' === 'true';
+
+            console.log(`🛡️ Applying branch protection to ${owner}/${repo}:${branch}`);
+
+            try {
+              await github.rest.repos.updateBranchProtection({
+                owner: owner,
+                repo: repo,
+                branch: branch,
+                required_status_checks: {
+                  strict: true,
+                  contexts: ['Organization Protection Policy CI']
+                },
+                enforce_admins: enforceAdmins,
+                required_pull_request_reviews: {
+                  required_approving_review_count: requiredReviewers,
+                  dismiss_stale_reviews: true,
+                  require_code_owner_reviews: true
+                },
+                restrictions: null,
+                allow_force_pushes: false,
+                allow_deletions: false
+              });
+
+              console.log(`✅ Successfully applied protection to ${repo}:${branch}`);
+
+            } catch (error) {
+              console.error(`❌ Failed to apply protection: ${error.message}`);
+              throw error;
+            }
+
+      - name: 🔍 Dry Run Preview
+        if: ${{ inputs.dry-run }}
+        run: |
+          echo "::notice title=Dry Run::Would apply protection to" \
+               "${{ matrix.repository.name }}:${{ inputs.target-branch }}"
+          echo "Settings that would be applied:"
+          echo "  • Required reviewers: ${{ inputs.required-reviewers }}"
+          echo "  • Enforce for admins: ${{ inputs.enforce-admins }}"
+          echo "  • Required status checks: Organization Protection Policy CI"
+          echo "  • Force pushes: Blocked"
+          echo "  • Branch deletion: Blocked"
+
+  # ---------------------------------------------------------------------------
+  # Results Summary and Reporting
+  # ---------------------------------------------------------------------------
+
+  summarize-results:
+    name: 📊 Summarize Results
+    needs: [discover-repositories, apply-protection]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📊 Generate Summary Report
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const totalRepos = '${{ needs.discover-repositories.outputs.total-count }}';
+            const isDryRun = '${{ inputs.dry-run }}' === 'true';
+            const targetBranch = '${{ inputs.target-branch }}';
+
+            console.log(`\n🎯 Organization Branch Protection Summary`);
+            console.log(`=====================================`);
+            console.log(`Organization: ${process.env.ORGANIZATION}`);
+            console.log(`Target Branch: ${targetBranch}`);
+            console.log(`Mode: ${isDryRun ? 'DRY RUN (Preview)' : 'LIVE APPLICATION'}`);
+            console.log(`Total Eligible Repositories: ${totalRepos}`);
+
+            if (isDryRun) {
+              console.log(`\n✅ Dry run completed successfully`);
+              console.log(`No changes were made to repositories`);
+              console.log(`Review the individual job outputs above for details`);
+            } else {
+              console.log(`\n✅ Branch protection application completed`);
+              console.log(`Check individual repository results above for any failures`);
+            }
+
+            // Create workflow summary
+            const summary = `
+            # Organization Branch Protection Report
+
+            **Organization:** ${process.env.ORGANIZATION}
+            **Target Branch:** \`${targetBranch}\`
+            **Mode:** ${isDryRun ? '🔍 Dry Run (Preview)' : '🛡️ Live Application'}
+            **Repositories Processed:** ${totalRepos}
+
+            ## Applied Settings
+            - **Required Reviewers:** ${{ inputs.required-reviewers }}
+            - **Enforce for Admins:** ${{ inputs.enforce-admins }}
+            - **Status Checks:** \`Organization Protection Policy CI\`
+            - **Force Pushes:** ❌ Blocked
+            - **Branch Deletion:** ❌ Blocked
+
+            ${isDryRun ? '> 💡 This was a dry run. No actual changes were made.' : ''}
+            `;
+
+            await core.summary
+              .addRaw(summary)
+              .write();

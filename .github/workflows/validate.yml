@@ -1,0 +1,12 @@
+# .github/workflows/validate.yml
+name: Validate GitHub Config
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate workflows
+        run: |
+          find .github/workflows -name "*.yml" -o -name "*.yaml" | \
+          xargs -I {} yamllint {}

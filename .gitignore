@@ -1,0 +1,69 @@
+# ============================================================================
+# GitHub Branch Protection Policy - .gitignore
+# ============================================================================
+
+# Log files and output
+logs/
+*.log
+TestResults/
+*.xml
+*.html
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Credentials and sensitive files
+*.pat
+*.token
+.secrets/
+.env
+.env.local
+
+# PowerShell specific
+*.ps1xml
+*.psd1.backup
+
+# IDE and editor files
+.vscode/settings.json
+.vscode/launch.json
+*.code-workspace
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Cache directories
+.cache/
+*.cache
+
+# Local configuration overrides
+config.local.json
+settings.local.json
