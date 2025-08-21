@@ -5,33 +5,33 @@
 
 ## 📈 Repository Statistics
 
-![GitHub stars](https://img.shields.io/github/stars/Stratovate-Solutions/.github?style=flat-square&logo=github)
-![GitHub forks](https://img.shields.io/github/forks/Stratovate-Solutions/.github?style=flat-square&logo=github)
-![GitHub issues](https://img.shields.io/github/issues/Stratovate-Solutions/.github?style=flat-square&logo=github)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/Stratovate-Solutions/.github?style=flat-square&logo=github)
-![Contributors](https://img.shields.io/github/contributors/Stratovate-Solutions/.github?style=flat-square&logo=github)
+![GitHub stars](https://img.shields.io/github/stars/Stratovate-Solutions/repository-name?style=flat-square&logo=github)
+![GitHub forks](https://img.shields.io/github/forks/Stratovate-Solutions/repository-name?style=flat-square&logo=github)
+![GitHub issues](https://img.shields.io/github/issues/Stratovate-Solutions/repository-name?style=flat-square&logo=github)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/Stratovate-Solutions/repository-name?style=flat-square&logo=github)
+![Contributors](https://img.shields.io/github/contributors/Stratovate-Solutions/repository-name?style=flat-square&logo=github)
 
 ## 🔧 Workflow Status
 
-![CI/CD Pipeline](https://img.shields.io/github/actions/workflow/status/Stratovate-Solutions/.github/ci.yml?branch=main&label=CI%2FCD&style=flat-square&logo=github-actions)
-![Lint and Validate](https://img.shields.io/github/actions/workflow/status/Stratovate-Solutions/.github/lint-validation.yml?branch=main&label=Lint%20%26%20Validate&style=flat-square&logo=github-actions)
-![Security Scan](https://img.shields.io/github/actions/workflow/status/Stratovate-Solutions/.github/reusable-security-scan.yml?branch=main&label=Security&style=flat-square&logo=shield)
-![Dependency Review](https://img.shields.io/github/actions/workflow/status/Stratovate-Solutions/.github/dependency-review.yml?branch=main&label=Dependencies&style=flat-square&logo=dependabot)
+![CI/CD Pipeline](https://img.shields.io/github/actions/workflow/status/Stratovate-Solutions/repository-name/ci.yml?branch=main&label=CI%2FCD&style=flat-square&logo=github-actions)
+![Lint and Validate](https://img.shields.io/github/actions/workflow/status/Stratovate-Solutions/repository-name/lint-validation.yml?branch=main&label=Lint%20%26%20Validate&style=flat-square&logo=github-actions)
+![Security Scan](https://img.shields.io/github/actions/workflow/status/Stratovate-Solutions/repository-name/reusable-security-scan.yml?branch=main&label=Security&style=flat-square&logo=shield)
+![Dependency Review](https://img.shields.io/github/actions/workflow/status/Stratovate-Solutions/repository-name/dependency-review.yml?branch=main&label=Dependencies&style=flat-square&logo=dependabot)
 
 ## 📊 Health Metrics
 
 | Metric | Value | Status |
 |--------|--------|--------|
-| **Workflow Success Rate** | 18.2% | 🔴 Needs Attention |
-| **Open Issues** | 0 | 🟢 Low |
+| **Workflow Success Rate** | 32.0% | 🔴 Needs Attention |
+| **Open Issues** | 1 | 🟢 Low |
 | **Open Pull Requests** | 0 | 🟢 Low |
-| **Contributors** | 1 | 🟡 Solo |
+| **Contributors** | 2 | 🟢 Active |
 | **Primary Language** | PowerShell | 🔧 Active |
 | **Latest Release** | No releases | 🚧 In Development |
 
 ## 🎯 Repository Health Score
 
-![Repository Health](https://img.shields.io/badge/Health-18.2%25-red?style=for-the-badge&logo=github)
+![Repository Health](https://img.shields.io/badge/Health-32.0%25-red?style=for-the-badge&logo=github)
 
 ### Health Indicators
 - **Code Quality**: ![PSScriptAnalyzer](https://img.shields.io/badge/PSScriptAnalyzer-Enabled-blue?style=flat-square)
@@ -51,7 +51,7 @@
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/Stratovate-Solutions/.github.git
+   git clone https://github.com/Stratovate-Solutions/repository-name.git
    ```
 
 2. **Explore the workflows**
