@@ -1,0 +1,355 @@
+# =============================================================================
+# Workflow Status Monitor
+# =============================================================================
+#
+# Purpose: Monitor and report on GitHub Actions workflow health and performance
+# Author: Stratovate Solutions DevOps Team
+# Version: 1.0
+# Last Updated: 2025-08-20
+#
+# This workflow provides comprehensive workflow monitoring including:
+# - Workflow success/failure rate tracking
+# - Performance metrics and trends
+# - Failed workflow notifications
+# - Weekly workflow health reports
+# - Historical data analysis
+# =============================================================================
+
+name: 📊 Workflow Status Monitor
+
+on:
+  schedule:
+    # Run daily at 9 AM UTC to check workflow health
+    - cron: '0 9 * * *'
+    # Run weekly on Sundays at 10 AM UTC for comprehensive report
+    - cron: '0 10 * * 0'
+  workflow_dispatch:
+    inputs:
+      report-type:
+        description: 'Type of report to generate'
+        required: false
+        default: 'daily'
+        type: choice
+        options:
+          - 'daily'
+          - 'weekly'
+          - 'monthly'
+      days-back:
+        description: 'Number of days to analyze'
+        required: false
+        default: '7'
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  workflow-health-check:
+    name: 🔍 Workflow Health Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📊 Analyze Workflow Health
+        id: workflow-health-check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const daysBack = parseInt('${{ github.event.inputs.days-back }}' || '7');
+            const since = new Date();
+            since.setDate(since.getDate() - daysBack);
+            
+            console.log(`Analyzing workflow runs from the last ${daysBack} days...`);
+            
+            try {
+              // Get workflow runs
+              const { data: workflows } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+                created: `>=${since.toISOString()}`
+              });
+              
+              const stats = {
+                total: workflows.total_count,
+                success: 0,
+                failure: 0,
+                cancelled: 0,
+                skipped: 0,
+                in_progress: 0,
+                workflows: {}
+              };
+              
+              // Analyze each run
+              workflows.workflow_runs.forEach(run => {
+                stats[run.conclusion || run.status]++;
+                
+                const workflowName = run.name;
+                if (!stats.workflows[workflowName]) {
+                  stats.workflows[workflowName] = {
+                    total: 0,
+                    success: 0,
+                    failure: 0,
+                    cancelled: 0,
+                    avg_duration: 0,
+                    durations: []
+                  };
+                }
+                
+                stats.workflows[workflowName].total++;
+                stats.workflows[workflowName][run.conclusion || run.status]++;
+                
+                if (run.conclusion && run.created_at && run.updated_at) {
+                  const duration = (new Date(run.updated_at) - new Date(run.created_at)) / 1000 / 60;
+                  stats.workflows[workflowName].durations.push(duration);
+                }
+              });
+              
+              // Calculate averages
+              Object.keys(stats.workflows).forEach(name => {
+                const workflow = stats.workflows[name];
+                if (workflow.durations.length > 0) {
+                  workflow.avg_duration = workflow.durations.reduce((a, b) => a + b, 0) / workflow.durations.length;
+                }
+              });
+              
+              // Create report
+              const successRate = stats.total > 0 ? (stats.success / stats.total * 100).toFixed(1) : 0;
+              
+              let report = `# 📊 Workflow Health Report\n\n`;
+              report += `**Analysis Period**: Last ${daysBack} days\n`;
+              report += `**Generated**: ${new Date().toISOString()}\n\n`;
+              
+              report += `## 📈 Overall Statistics\n\n`;
+              report += `- **Total Runs**: ${stats.total}\n`;
+              report += `- **Success Rate**: ${successRate}%\n`;
+              report += `- **Successful**: ${stats.success}\n`;
+              report += `- **Failed**: ${stats.failure}\n`;
+              report += `- **Cancelled**: ${stats.cancelled}\n`;
+              report += `- **In Progress**: ${stats.in_progress}\n\n`;
+              
+              report += `## 🔧 Workflow Breakdown\n\n`;
+              Object.entries(stats.workflows).forEach(([name, data]) => {
+                const workflowSuccessRate = data.total > 0 ? (data.success / data.total * 100).toFixed(1) : 0;
+                const avgDuration = data.avg_duration.toFixed(1);
+                
+                report += `### ${name}\n`;
+                report += `- **Runs**: ${data.total}\n`;
+                report += `- **Success Rate**: ${workflowSuccessRate}%\n`;
+                report += `- **Avg Duration**: ${avgDuration} minutes\n`;
+                report += `- **Success**: ${data.success} | **Failure**: ${data.failure}\n\n`;
+              });
+              
+              // Health recommendations
+              report += `## 🎯 Recommendations\n\n`;
+              
+              if (parseFloat(successRate) < 90) {
+                report += `- ⚠️ **Action Required**: Success rate (${successRate}%) is below 90%\n`;
+              } else if (parseFloat(successRate) < 95) {
+                report += `- 📈 **Monitor**: Success rate (${successRate}%) could be improved\n`;
+              } else {
+                report += `- ✅ **Excellent**: Success rate (${successRate}%) is healthy\n`;
+              }
+              
+              Object.entries(stats.workflows).forEach(([name, data]) => {
+                const workflowSuccessRate = data.total > 0 ? (data.success / data.total * 100) : 0;
+                if (workflowSuccessRate < 90 && data.total > 2) {
+                  report += `- 🔧 **Fix Required**: "${name}" has low success rate (${workflowSuccessRate.toFixed(1)}%)\n`;
+                }
+                if (data.avg_duration > 30) {
+                  report += `- ⏱️ **Optimize**: "${name}" has long average duration (${data.avg_duration.toFixed(1)} min)\n`;
+                }
+              });
+              
+              if (stats.failure > 0) {
+                report += `- 🔍 **Review**: ${stats.failure} failed workflow runs need investigation\n`;
+              }
+              
+              report += `\n---\n*Generated by Stratovate Solutions Workflow Monitor*`;
+              
+              // Save report
+              require('fs').writeFileSync('workflow-health-report.md', report);
+              
+              console.log('Workflow health report generated');
+              console.log(`Success rate: ${successRate}%`);
+              console.log(`Failed runs: ${stats.failure}`);
+              
+              // Set outputs for next steps
+              core.setOutput('success_rate', successRate);
+              core.setOutput('failed_runs', stats.failure);
+              core.setOutput('needs_attention', parseFloat(successRate) < 90);
+              
+            } catch (error) {
+              console.error('Error analyzing workflows:', error);
+              core.setFailed(`Failed to analyze workflows: ${error.message}`);
+            }
+
+      - name: 📤 Upload Health Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-health-report-${{ github.event.inputs.report-type || 'daily' }}
+          path: workflow-health-report.md
+          retention-days: 90
+
+      - name: 🚨 Create Issue for Failed Workflows
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // This step will create an issue only if there are significant issues
+            console.log('Checking if workflow health issue creation is needed...');
+            
+            // Check if there's already an open issue
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'workflow-health,automation'
+            });
+            
+            const existingIssue = issues.find(issue => 
+              issue.title.includes('Workflow Health Alert')
+            );
+            
+            const issueBody = `## 🚨 Workflow Health Alert
+            
+            The automated workflow health check has detected issues that require attention:
+            
+            ### 📊 Current Status
+            - **Success Rate**: ${successRate}%
+            - **Failed Runs**: ${failedRuns}
+            - **Threshold**: 90% success rate
+            
+            ### 🎯 Action Required
+            - Review failed workflow runs in the Actions tab
+            - Investigate root causes of failures
+            - Fix any recurring issues
+            - Consider optimizing slow-running workflows
+            
+            ### 📋 Next Steps
+            1. Download the detailed health report from workflow artifacts
+            2. Analyze specific workflow failures
+            3. Implement fixes for identified issues
+            4. Monitor success rate improvement
+            
+            ### 📊 Detailed Report
+            A comprehensive workflow health report is available in the workflow artifacts.
+            
+            ---
+            *This issue was automatically created by the Workflow Status Monitor*
+            *Close this issue when all workflow health issues have been addressed*`;
+            
+            if (existingIssue) {
+              // Update existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `## 📊 Updated Health Check Results\n\n${issueBody.split('## 🚨 Workflow Health Alert')[1]}`
+              });
+              console.log(`Updated existing issue #${existingIssue.number}`);
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '🚨 Workflow Health Alert - Action Required',
+                body: issueBody,
+                labels: ['workflow-health', 'automation', 'high-priority']
+              });
+              console.log('Created new workflow health issue');
+            }
+
+  weekly-summary:
+    name: 📊 Weekly Summary
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 10 * * 0' || github.event.inputs.report-type == 'weekly'
+    timeout-minutes: 10
+
+    steps:
+      - name: 📊 Generate Weekly Summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const since = new Date();
+            since.setDate(since.getDate() - 7);
+            
+            console.log('Generating weekly workflow summary...');
+            
+            try {
+              const { data: workflows } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+                created: `>=${since.toISOString()}`
+              });
+              
+              const weeklyStats = {
+                totalRuns: workflows.total_count,
+                successfulRuns: workflows.workflow_runs.filter(run => run.conclusion === 'success').length,
+                failedRuns: workflows.workflow_runs.filter(run => run.conclusion === 'failure').length,
+                uniqueWorkflows: new Set(workflows.workflow_runs.map(run => run.name)).size,
+                totalDuration: 0,
+                averageDuration: 0
+              };
+              
+              // Calculate total duration
+              workflows.workflow_runs.forEach(run => {
+                if (run.created_at && run.updated_at) {
+                  weeklyStats.totalDuration += (new Date(run.updated_at) - new Date(run.created_at));
+                }
+              });
+              
+              weeklyStats.averageDuration = weeklyStats.totalRuns > 0 
+                ? (weeklyStats.totalDuration / weeklyStats.totalRuns / 1000 / 60).toFixed(1)
+                : 0;
+              
+              const successRate = weeklyStats.totalRuns > 0 
+                ? (weeklyStats.successfulRuns / weeklyStats.totalRuns * 100).toFixed(1)
+                : 0;
+              
+              let summary = `# 📊 Weekly Workflow Summary\n\n`;
+              summary += `**Week Ending**: ${new Date().toDateString()}\n\n`;
+              summary += `## 🎯 Key Metrics\n\n`;
+              summary += `- **Total Workflow Runs**: ${weeklyStats.totalRuns}\n`;
+              summary += `- **Success Rate**: ${successRate}%\n`;
+              summary += `- **Active Workflows**: ${weeklyStats.uniqueWorkflows}\n`;
+              summary += `- **Average Duration**: ${weeklyStats.averageDuration} minutes\n\n`;
+              
+              summary += `## 📈 Performance Indicators\n\n`;
+              if (parseFloat(successRate) >= 95) {
+                summary += `- ✅ **Excellent**: Success rate is excellent (${successRate}%)\n`;
+              } else if (parseFloat(successRate) >= 90) {
+                summary += `- 👍 **Good**: Success rate is acceptable (${successRate}%)\n`;
+              } else {
+                summary += `- ⚠️ **Needs Improvement**: Success rate needs attention (${successRate}%)\n`;
+              }
+              
+              if (weeklyStats.averageDuration < 10) {
+                summary += `- ⚡ **Fast**: Average duration is excellent (${weeklyStats.averageDuration} min)\n`;
+              } else if (weeklyStats.averageDuration < 20) {
+                summary += `- 👍 **Good**: Average duration is reasonable (${weeklyStats.averageDuration} min)\n`;
+              } else {
+                summary += `- 🐌 **Slow**: Consider optimizing workflows (${weeklyStats.averageDuration} min)\n`;
+              }
+              
+              summary += `\n---\n*Weekly summary generated by Stratovate Solutions Workflow Monitor*`;
+              
+              require('fs').writeFileSync('weekly-summary.md', summary);
+              console.log('Weekly summary generated');
+              
+            } catch (error) {
+              console.error('Error generating weekly summary:', error);
+              core.setFailed(`Failed to generate weekly summary: ${error.message}`);
+            }
+
+      - name: 📤 Upload Weekly Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-workflow-summary
+          path: weekly-summary.md
+          retention-days: 365

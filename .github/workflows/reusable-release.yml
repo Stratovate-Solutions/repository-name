@@ -43,6 +43,11 @@ on:
         description: 'PowerShell Gallery API key'
         required: false
 
+# Concurrency control for releases
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
 jobs:
   create-release:
     runs-on: ubuntu-latest

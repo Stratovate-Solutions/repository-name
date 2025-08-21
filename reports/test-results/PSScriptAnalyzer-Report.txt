@@ -1,0 +1,20 @@
+PSScriptAnalyzer Analysis Report
+Generated: 08/20/2025 17:35:15
+======================================
+
+Summary:
+  Total Files Analyzed: 11
+  Total Issues: 1
+  Errors: 0
+  Warnings: 1
+  Information: 0
+
+Detailed Issues:
+================
+File: fix-yaml-issues.ps1
+Line: 62, Column: 5
+Severity: Warning
+Rule: PSUseDeclaredVarsMoreThanAssignments
+Message: The variable 'originalContent' is assigned but never used.
+---
+

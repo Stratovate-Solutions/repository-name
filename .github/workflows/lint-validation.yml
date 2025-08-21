@@ -1,0 +1,582 @@
+# =============================================================================
+# Lint and Validate GitHub Configuration
+# =============================================================================
+#
+# Purpose: Comprehensive linting and validation for GitHub configuration,
+#          repository structure, and file formats
+# Author: Stratovate Solutions DevOps Team
+# Version: 2.1
+# Last Updated: 2025-08-20
+#
+# This workflow provides comprehensive validation including:
+# - YAML file linting and schema validation
+# - Markdown file linting and formatting
+# - JSON file validation
+# - GitHub configuration validation
+# - Repository structure analysis
+# - Issue template validation
+# - Workflow schema validation
+#
+# Workflow Triggers:
+# - Push to main/develop branches
+# - Pull requests targeting main branch
+# - Manual dispatch for on-demand validation
+# =============================================================================
+
+name: Lint and Validate GitHub Configuration
+
+# =============================================================================
+# Workflow Triggers
+# =============================================================================
+
+on:
+  push:
+    branches: [main, develop, master]
+    paths:
+      - '.github/**'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.md'
+      - '**/*.json'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - '.github/**'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.md'
+      - '**/*.json'
+  workflow_dispatch:
+
+# =============================================================================
+# Global Workflow Configuration
+# =============================================================================
+
+# Concurrency control to prevent multiple runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+# =============================================================================
+# Validation Jobs Pipeline
+# =============================================================================
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: YAML Linting and Validation
+  # ---------------------------------------------------------------------------
+  yaml-lint:
+    name: 📄 YAML Linting & Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install yamllint
+        run: pip install yamllint
+
+      - name: ⚙️ Create yamllint config
+        run: |
+          cat > .yamllint.yml << EOF
+          extends: default
+          rules:
+            line-length:
+              max: 120
+            indentation:
+              spaces: 2
+            comments:
+              min-spaces-from-content: 1
+            trailing-spaces: enable
+            truthy:
+              allowed-values: ['true', 'false', 'on', 'off']
+            document-start: disable
+            empty-lines:
+              max: 2
+              max-start: 1
+              max-end: 1
+          EOF
+
+      - name: 🔍 Lint YAML Workflow Files
+        run: |
+          echo "=== YAML Workflow Validation ==="
+          
+          # Find all workflow files
+          workflow_files=$(find .github/workflows -name "*.yml" -o -name "*.yaml" 2>/dev/null || true)
+          
+          if [ -z "$workflow_files" ]; then
+            echo "⚠️ No workflow files found in .github/workflows"
+            exit 0
+          fi
+          
+          echo "📄 Found workflow files:"
+          echo "$workflow_files"
+          echo ""
+          
+          # Validate each workflow file
+          validation_passed=true
+          
+          for file in $workflow_files; do
+            echo "🔍 Validating: $file"
+            
+            if yamllint -c .yamllint.yml "$file"; then
+              echo "✅ $file passed YAML validation"
+            else
+              echo "❌ $file failed YAML validation"
+              validation_passed=false
+            fi
+            echo ""
+          done
+          
+          if [ "$validation_passed" = true ]; then
+            echo "🎉 All workflow files passed validation!"
+          else
+            echo "❌ Some workflow files failed validation"
+            exit 1
+          fi
+
+      - name: 📋 Lint Other YAML Files
+        run: |
+          echo "=== Other YAML Files Validation ==="
+          
+          # Find other YAML files (excluding workflows)
+          other_yaml_files=$(find . -name "*.yml" -o -name "*.yaml" | grep -v ".github/workflows" | grep -v ".yamllint.yml" || true)
+          
+          if [ -z "$other_yaml_files" ]; then
+            echo "ℹ️ No other YAML files found"
+          else
+            echo "📄 Found other YAML files:"
+            echo "$other_yaml_files"
+            echo ""
+            
+            for file in $other_yaml_files; do
+              echo "🔍 Validating: $file"
+              if yamllint -c .yamllint.yml "$file"; then
+                echo "✅ $file passed YAML validation"
+              else
+                echo "⚠️ $file has YAML issues (non-critical)"
+              fi
+              echo ""
+            done
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Markdown Linting
+  # ---------------------------------------------------------------------------
+  markdown-lint:
+    name: 📝 Markdown Linting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📝 Lint Markdown Files
+        uses: DavidAnson/markdownlint-cli2-action@v14
+        with:
+          globs: |
+            **/*.md
+            !node_modules/**
+            !.git/**
+          config: |
+            {
+              "default": true,
+              "MD013": {
+                "line_length": 120,
+                "code_blocks": false,
+                "tables": false
+              },
+              "MD033": false,
+              "MD041": false,
+              "MD024": {
+                "allow_different_nesting": true
+              },
+              "MD029": {
+                "style": "ordered"
+              }
+            }
+
+      - name: 📊 Markdown File Summary
+        run: |
+          echo "=== Markdown File Summary ==="
+          
+          # Count markdown files
+          md_count=$(find . -name "*.md" -type f | grep -v node_modules | grep -v .git | wc -l)
+          echo "📄 Total Markdown files: $md_count"
+          
+          if [ $md_count -gt 0 ]; then
+            echo ""
+            echo "📋 Markdown files found:"
+            find . -name "*.md" -type f | grep -v node_modules | grep -v .git | head -10 | sed 's/^/  - /'
+            if [ $md_count -gt 10 ]; then
+              echo "  ... and $((md_count - 10)) more"
+            fi
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Schema Validation
+  # ---------------------------------------------------------------------------
+  schema-validation:
+    name: 🔧 Schema Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 Install Schema Validation Tools
+        run: |
+          npm install -g ajv-cli
+          npm install -g js-yaml
+
+      - name: 🔍 Validate Workflow Schemas
+        run: |
+          echo "=== GitHub Workflow Schema Validation ==="
+          
+          workflow_validation_passed=true
+          
+          for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
+            if [ -f "$workflow" ]; then
+              echo "🔍 Validating schema for: $workflow"
+              
+              # Convert YAML to JSON and validate against GitHub workflow schema
+              if js-yaml "$workflow" > temp.json 2>/dev/null; then
+                # Basic structure validation (GitHub schema validation via API is complex)
+                if grep -q '"on"\|"jobs"' temp.json; then
+                  echo "✅ $workflow has valid basic structure"
+                else
+                  echo "❌ $workflow missing required fields (on, jobs)"
+                  workflow_validation_passed=false
+                fi
+                rm -f temp.json
+              else
+                echo "❌ $workflow failed YAML to JSON conversion"
+                workflow_validation_passed=false
+              fi
+              echo ""
+            fi
+          done
+          
+          if [ "$workflow_validation_passed" = false ]; then
+            echo "❌ Some workflows failed schema validation"
+            exit 1
+          else
+            echo "🎉 All workflows passed basic schema validation!"
+          fi
+
+      - name: 🐛 Validate Issue Template Schemas
+        run: |
+          echo "=== Issue Template Schema Validation ==="
+          
+          if [ ! -d ".github/ISSUE_TEMPLATE" ]; then
+            echo "ℹ️ No issue templates directory found"
+            exit 0
+          fi
+          
+          template_validation_passed=true
+          template_count=0
+          
+          for template in .github/ISSUE_TEMPLATE/*.yml .github/ISSUE_TEMPLATE/*.yaml; do
+            if [ -f "$template" ]; then
+              template_count=$((template_count + 1))
+              echo "🔍 Validating: $template"
+              
+              # Skip config.yml as it's not an issue template
+              if [[ "$(basename "$template")" == "config.yml" ]]; then
+                echo "ℹ️ Skipping $template (configuration file)"
+                continue
+              fi
+              
+              if js-yaml "$template" > temp.json 2>/dev/null; then
+                # Check for required fields
+                if grep -q '"name"' temp.json && grep -q '"description"' temp.json; then
+                  echo "✅ $template has required fields"
+                else
+                  echo "❌ $template missing required fields (name, description)"
+                  template_validation_passed=false
+                fi
+                rm -f temp.json
+              else
+                echo "❌ $template failed YAML parsing"
+                template_validation_passed=false
+              fi
+              echo ""
+            fi
+          done
+          
+          if [ $template_count -eq 0 ]; then
+            echo "ℹ️ No issue templates found"
+          elif [ "$template_validation_passed" = false ]; then
+            echo "❌ Some issue templates failed validation"
+            exit 1
+          else
+            echo "🎉 All issue templates passed validation!"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 4: JSON Validation
+  # ---------------------------------------------------------------------------
+  json-validation:
+    name: 📋 JSON Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Validate JSON Files
+        run: |
+          echo "=== JSON File Validation ==="
+          
+          # Find JSON files
+          json_files=$(find . -name "*.json" -type f | grep -v node_modules | grep -v .git || true)
+          
+          if [ -z "$json_files" ]; then
+            echo "ℹ️ No JSON files found"
+            exit 0
+          fi
+          
+          echo "📄 Found JSON files:"
+          echo "$json_files" | sed 's/^/  - /'
+          echo ""
+          
+          validation_passed=true
+          
+          echo "$json_files" | while read -r file; do
+            echo "🔍 Validating: $file"
+            if python3 -m json.tool "$file" > /dev/null 2>&1; then
+              echo "✅ $file is valid JSON"
+            else
+              echo "❌ $file is not valid JSON"
+              validation_passed=false
+            fi
+            echo ""
+          done
+          
+          # Check the validation result
+          if [ "$validation_passed" = false ]; then
+            echo "❌ Some JSON files failed validation"
+            exit 1
+          else
+            echo "🎉 All JSON files are valid!"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 5: GitHub Configuration Validation
+  # ---------------------------------------------------------------------------
+  github-config-validation:
+    name: 🔧 GitHub Config Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Validate Repository Structure
+        run: |
+          echo "=== Repository Structure Validation ==="
+          
+          # Check for essential GitHub files
+          echo "📋 Checking GitHub configuration files..."
+          
+          config_score=0
+          max_score=6
+          
+          if [ -f ".github/CODEOWNERS" ] || [ -f "CODEOWNERS" ]; then
+            echo "✅ CODEOWNERS file found"
+            config_score=$((config_score + 1))
+          else
+            echo "ℹ️ CODEOWNERS file not found (optional)"
+          fi
+          
+          if [ -f ".github/PULL_REQUEST_TEMPLATE.md" ] || [ -f "PULL_REQUEST_TEMPLATE.md" ]; then
+            echo "✅ Pull request template found"
+            config_score=$((config_score + 1))
+          else
+            echo "ℹ️ Pull request template not found (recommended)"
+          fi
+          
+          if [ -d ".github/ISSUE_TEMPLATE" ]; then
+            echo "✅ Issue templates directory found"
+            template_count=$(find .github/ISSUE_TEMPLATE -name "*.yml" -o -name "*.yaml" -o -name "*.md" | wc -l)
+            echo "  📄 Issue templates: $template_count"
+            config_score=$((config_score + 1))
+          else
+            echo "ℹ️ Issue templates not found (recommended)"
+          fi
+          
+          # Check for security files
+          if [ -f "SECURITY.md" ] || [ -f ".github/SECURITY.md" ]; then
+            echo "✅ Security policy found"
+            config_score=$((config_score + 1))
+          else
+            echo "ℹ️ Security policy not found (recommended)"
+          fi
+          
+          # Check for contribution guidelines
+          if [ -f "CONTRIBUTING.md" ] || [ -f ".github/CONTRIBUTING.md" ]; then
+            echo "✅ Contributing guidelines found"
+            config_score=$((config_score + 1))
+          else
+            echo "ℹ️ Contributing guidelines not found (recommended)"
+          fi
+          
+          # Check for README
+          if [ -f "README.md" ]; then
+            echo "✅ README.md found"
+            config_score=$((config_score + 1))
+          else
+            echo "⚠️ README.md not found (strongly recommended)"
+          fi
+          
+          echo ""
+          echo "📊 Configuration Score: $config_score/$max_score"
+          
+          # Set configuration health level
+          if [ $config_score -ge 5 ]; then
+            echo "🎉 Excellent repository configuration!"
+          elif [ $config_score -ge 3 ]; then
+            echo "👍 Good repository configuration"
+          else
+            echo "⚠️ Repository configuration could be improved"
+          fi
+
+      - name: 📊 Generate Comprehensive Validation Report
+        if: always()
+        run: |
+          echo "=== Comprehensive Validation Report ==="
+          
+          # Count various file types
+          workflow_count=$(find .github/workflows -name "*.yml" -o -name "*.yaml" 2>/dev/null | wc -l)
+          issue_template_count=$(find .github/ISSUE_TEMPLATE -name "*.yml" -o -name "*.yaml" -o -name "*.md" 2>/dev/null | wc -l)
+          markdown_count=$(find . -name "*.md" -type f | grep -v node_modules | grep -v .git | wc -l)
+          json_count=$(find . -name "*.json" -type f | grep -v node_modules | grep -v .git | wc -l)
+          yaml_count=$(find . -name "*.yml" -o -name "*.yaml" | wc -l)
+          
+          cat > validation-report.md << EOF
+          # 🔍 GitHub Configuration Validation Report
+          
+          ## 📊 File Summary
+          
+          ### File Types
+          - **Workflows**: $workflow_count files
+          - **Issue Templates**: $issue_template_count templates
+          - **Markdown Files**: $markdown_count files
+          - **JSON Files**: $json_count files
+          - **YAML Files**: $yaml_count files
+          
+          ### Workflow Files
+          $(find .github/workflows -name "*.yml" -o -name "*.yaml" 2>/dev/null | sed 's/^/- /' || echo "- None found")
+          
+          ### Repository Health Check
+          - **README**: $([ -f "README.md" ] && echo "✅ Present" || echo "❌ Missing")
+          - **Pull Request Template**: $([ -f ".github/PULL_REQUEST_TEMPLATE.md" ] || [ -f "PULL_REQUEST_TEMPLATE.md" ] && echo "✅ Present" || echo "⚠️ Missing")
+          - **Issue Templates**: $issue_template_count templates configured
+          - **Contributing Guidelines**: $([ -f "CONTRIBUTING.md" ] || [ -f ".github/CONTRIBUTING.md" ] && echo "✅ Present" || echo "⚠️ Missing")
+          - **Security Policy**: $([ -f "SECURITY.md" ] || [ -f ".github/SECURITY.md" ] && echo "✅ Present" || echo "⚠️ Missing")
+          - **Code Owners**: $([ -f ".github/CODEOWNERS" ] || [ -f "CODEOWNERS" ] && echo "✅ Present" || echo "ℹ️ Not configured")
+          
+          ### Recommendations
+          $([ ! -f "README.md" ] && echo "- 📝 Add README.md for project documentation")
+          $([ ! -f "CONTRIBUTING.md" ] && [ ! -f ".github/CONTRIBUTING.md" ] && echo "- 📝 Consider adding CONTRIBUTING.md")
+          $([ ! -f "SECURITY.md" ] && [ ! -f ".github/SECURITY.md" ] && echo "- 🔒 Consider adding SECURITY.md")
+          $([ ! -f ".github/CODEOWNERS" ] && [ ! -f "CODEOWNERS" ] && echo "- 👥 Consider adding CODEOWNERS file")
+          $([ $issue_template_count -eq 0 ] && echo "- 🐛 Consider adding issue templates")
+          $([ ! -f ".github/PULL_REQUEST_TEMPLATE.md" ] && [ ! -f "PULL_REQUEST_TEMPLATE.md" ] && echo "- 📋 Consider adding pull request template")
+          
+          ---
+          Generated on $(date) by Stratovate Solutions Validation Pipeline
+          EOF
+          
+          echo "📋 Validation Report:"
+          cat validation-report.md
+
+      - name: 📤 Upload Validation Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-report
+          path: validation-report.md
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Job 6: Validation Summary
+  # ---------------------------------------------------------------------------
+  validation-summary:
+    name: 📋 Validation Summary
+    runs-on: ubuntu-latest
+    needs: [yaml-lint, markdown-lint, schema-validation, json-validation, github-config-validation]
+    if: always()
+
+    steps:
+      - name: 📊 Generate Summary
+        run: |
+          echo "::group::Validation Results"
+          echo "YAML Linting: ${{ needs.yaml-lint.result }}"
+          echo "Markdown Linting: ${{ needs.markdown-lint.result }}"
+          echo "Schema Validation: ${{ needs.schema-validation.result }}"
+          echo "JSON Validation: ${{ needs.json-validation.result }}"
+          echo "GitHub Config: ${{ needs.github-config-validation.result }}"
+
+          # Determine overall status
+          if [[ "${{ needs.yaml-lint.result }}" == "success" && \
+                "${{ needs.markdown-lint.result }}" == "success" && \
+                "${{ needs.schema-validation.result }}" == "success" && \
+                "${{ needs.json-validation.result }}" == "success" && \
+                "${{ needs.github-config-validation.result }}" == "success" ]]; then
+            echo "✅ All validation checks passed!"
+            echo "Repository configuration is properly formatted and valid."
+          else
+            echo "❌ Some validation checks failed"
+            echo "Please review the failed jobs and fix any issues."
+            exit 1
+          fi
+          echo "::endgroup::"
+
+      - name: 💬 PR Comment (on failure)
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ⚠️ Validation Pipeline Failed
+
+              The GitHub configuration validation pipeline has failed. Please check the following:
+
+              - **YAML Linting**: ${{ needs.yaml-lint.result }}
+              - **Markdown Linting**: ${{ needs.markdown-lint.result }}
+              - **Schema Validation**: ${{ needs.schema-validation.result }}
+              - **JSON Validation**: ${{ needs.json-validation.result }}
+              - **GitHub Config**: ${{ needs.github-config-validation.result }}
+
+              ### Next Steps:
+              1. Review the failed job logs above
+              2. Fix any formatting or validation issues
+              3. Push your changes to re-trigger validation
+
+              For detailed validation report, check the workflow artifacts.
+              `
+            })

@@ -1,0 +1,30 @@
+name: Repository Settings Sync
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/settings.yml'
+  workflow_dispatch:
+
+# Concurrency control to prevent multiple runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync-settings:
+    name: Sync Repository Settings
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Repository Settings Documentation
+        run: |
+          echo "Repository settings file updated."
+          echo "Review the settings.yml file and apply manually or use GitHub CLI:"
+          echo "gh api repos/${{ github.repository }} --method PATCH --input .github/settings.yml"

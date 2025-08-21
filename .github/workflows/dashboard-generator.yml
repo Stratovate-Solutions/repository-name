@@ -1,0 +1,346 @@
+# =============================================================================
+# Repository Health Dashboard Generator
+# =============================================================================
+#
+# Purpose: Generate a comprehensive repository health dashboard with badges
+# Author: Stratovate Solutions DevOps Team
+# Version: 1.0
+# Last Updated: 2025-08-20
+#
+# This workflow creates a dynamic README section with:
+# - Workflow status badges
+# - Repository health metrics
+# - Code quality indicators
+# - Security status
+# - Contribution statistics
+# =============================================================================
+
+name: 📊 Repository Health Dashboard
+
+on:
+  schedule:
+    # Update dashboard daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      force-update:
+        description: 'Force update even if no changes'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+
+permissions:
+  contents: write
+  actions: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  generate-dashboard:
+    name: 📊 Generate Health Dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: 📊 Collect Repository Metrics
+        id: metrics
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            
+            console.log('Collecting repository metrics...');
+            
+            try {
+              // Get repository information
+              const { data: repoData } = await github.rest.repos.get({ owner, repo });
+              
+              // Get workflow runs (last 30 days)
+              const thirtyDaysAgo = new Date();
+              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+              
+              const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner,
+                repo,
+                per_page: 100,
+                created: `>=${thirtyDaysAgo.toISOString()}`
+              });
+              
+              // Calculate workflow success rate
+              const totalRuns = workflowRuns.total_count;
+              const successfulRuns = workflowRuns.workflow_runs.filter(run => run.conclusion === 'success').length;
+              const successRate = totalRuns > 0 ? (successfulRuns / totalRuns * 100).toFixed(1) : 0;
+              
+              // Get open issues and PRs
+              const { data: openIssues } = await github.rest.issues.listForRepo({
+                owner,
+                repo,
+                state: 'open',
+                per_page: 1
+              });
+              
+              const { data: openPRs } = await github.rest.pulls.list({
+                owner,
+                repo,
+                state: 'open',
+                per_page: 1
+              });
+              
+              // Get contributors
+              const { data: contributors } = await github.rest.repos.listContributors({
+                owner,
+                repo,
+                per_page: 100
+              });
+              
+              // Get languages
+              const { data: languages } = await github.rest.repos.listLanguages({ owner, repo });
+              const primaryLanguage = Object.keys(languages)[0] || 'Unknown';
+              
+              // Get latest release
+              let latestRelease = null;
+              try {
+                const { data: release } = await github.rest.repos.getLatestRelease({ owner, repo });
+                latestRelease = release.tag_name;
+              } catch (error) {
+                console.log('No releases found');
+              }
+              
+              const metrics = {
+                repoName: repoData.name,
+                description: repoData.description || 'No description available',
+                stars: repoData.stargazers_count,
+                forks: repoData.forks_count,
+                openIssues: openIssues.length > 0 ? openIssues.length : 0,
+                openPRs: openPRs.length > 0 ? openPRs.length : 0,
+                contributors: contributors.length,
+                primaryLanguage,
+                successRate,
+                totalRuns,
+                latestRelease: latestRelease || 'No releases',
+                lastUpdated: new Date().toISOString().split('T')[0]
+              };
+              
+              // Save metrics for next step
+              require('fs').writeFileSync('metrics.json', JSON.stringify(metrics, null, 2));
+              
+              console.log('Metrics collected:', metrics);
+              return metrics;
+              
+            } catch (error) {
+              console.error('Error collecting metrics:', error);
+              throw error;
+            }
+
+      - name: 🎨 Generate Dashboard Content
+        run: |
+          echo "Generating repository health dashboard..."
+          
+          # Read metrics
+          METRICS=$(cat metrics.json)
+          REPO_NAME=$(echo "$METRICS" | jq -r '.repoName')
+          DESCRIPTION=$(echo "$METRICS" | jq -r '.description')
+          STARS=$(echo "$METRICS" | jq -r '.stars')
+          FORKS=$(echo "$METRICS" | jq -r '.forks')
+          OPEN_ISSUES=$(echo "$METRICS" | jq -r '.openIssues')
+          OPEN_PRS=$(echo "$METRICS" | jq -r '.openPRs')
+          CONTRIBUTORS=$(echo "$METRICS" | jq -r '.contributors')
+          LANGUAGE=$(echo "$METRICS" | jq -r '.primaryLanguage')
+          SUCCESS_RATE=$(echo "$METRICS" | jq -r '.successRate')
+          LATEST_RELEASE=$(echo "$METRICS" | jq -r '.latestRelease')
+          LAST_UPDATED=$(echo "$METRICS" | jq -r '.lastUpdated')
+          
+          # Generate health status
+          if (( $(echo "$SUCCESS_RATE >= 95" | bc -l) )); then
+            HEALTH_STATUS="🟢 Excellent"
+            HEALTH_COLOR="brightgreen"
+          elif (( $(echo "$SUCCESS_RATE >= 90" | bc -l) )); then
+            HEALTH_STATUS="🟡 Good"
+            HEALTH_COLOR="yellow"
+          elif (( $(echo "$SUCCESS_RATE >= 80" | bc -l) )); then
+            HEALTH_STATUS="🟠 Fair"
+            HEALTH_COLOR="orange"
+          else
+            HEALTH_STATUS="🔴 Needs Attention"
+            HEALTH_COLOR="red"
+          fi
+          
+          # Create dashboard content
+          cat > repository-dashboard.md << EOF
+          <!-- REPOSITORY_HEALTH_DASHBOARD_START -->
+          # 📊 Repository Health Dashboard
+          
+          > $DESCRIPTION
+          
+          ## 📈 Repository Statistics
+          
+          ![GitHub stars](https://img.shields.io/github/stars/${{ github.repository }}?style=flat-square&logo=github)
+          ![GitHub forks](https://img.shields.io/github/forks/${{ github.repository }}?style=flat-square&logo=github)
+          ![GitHub issues](https://img.shields.io/github/issues/${{ github.repository }}?style=flat-square&logo=github)
+          ![GitHub pull requests](https://img.shields.io/github/issues-pr/${{ github.repository }}?style=flat-square&logo=github)
+          ![Contributors](https://img.shields.io/github/contributors/${{ github.repository }}?style=flat-square&logo=github)
+          
+          ## 🔧 Workflow Status
+          
+          ![CI/CD Pipeline](https://img.shields.io/github/actions/workflow/status/${{ github.repository }}/ci.yml?branch=main&label=CI%2FCD&style=flat-square&logo=github-actions)
+          ![Lint and Validate](https://img.shields.io/github/actions/workflow/status/${{ github.repository }}/lint-validation.yml?branch=main&label=Lint%20%26%20Validate&style=flat-square&logo=github-actions)
+          ![Security Scan](https://img.shields.io/github/actions/workflow/status/${{ github.repository }}/reusable-security-scan.yml?branch=main&label=Security&style=flat-square&logo=shield)
+          ![Dependency Review](https://img.shields.io/github/actions/workflow/status/${{ github.repository }}/dependency-review.yml?branch=main&label=Dependencies&style=flat-square&logo=dependabot)
+          
+          ## 📊 Health Metrics
+          
+          | Metric | Value | Status |
+          |--------|--------|--------|
+          | **Workflow Success Rate** | ${SUCCESS_RATE}% | ${HEALTH_STATUS} |
+          | **Open Issues** | ${OPEN_ISSUES} | $([ "$OPEN_ISSUES" -lt 5 ] && echo "🟢 Low" || echo "🟡 Moderate") |
+          | **Open Pull Requests** | ${OPEN_PRS} | $([ "$OPEN_PRS" -lt 3 ] && echo "🟢 Low" || echo "🟡 Moderate") |
+          | **Contributors** | ${CONTRIBUTORS} | $([ "$CONTRIBUTORS" -gt 1 ] && echo "🟢 Active" || echo "🟡 Solo") |
+          | **Primary Language** | ${LANGUAGE} | 🔧 Active |
+          | **Latest Release** | ${LATEST_RELEASE} | $([ "$LATEST_RELEASE" != "No releases" ] && echo "📦 Available" || echo "🚧 In Development") |
+          
+          ## 🎯 Repository Health Score
+          
+          ![Repository Health](https://img.shields.io/badge/Health-${SUCCESS_RATE}%25-${HEALTH_COLOR}?style=for-the-badge&logo=github)
+          
+          ### Health Indicators
+          - **Code Quality**: ![PSScriptAnalyzer](https://img.shields.io/badge/PSScriptAnalyzer-Enabled-blue?style=flat-square)
+          - **Testing**: ![Pester](https://img.shields.io/badge/Pester-Enabled-green?style=flat-square)
+          - **Security**: ![CodeQL](https://img.shields.io/badge/CodeQL-Enabled-purple?style=flat-square)
+          - **Dependencies**: ![Dependabot](https://img.shields.io/badge/Dependabot-Enabled-orange?style=flat-square)
+          
+          ## 📋 Quick Links
+          
+          - [📊 Actions](../../actions) - View workflow runs and status
+          - [🐛 Issues](../../issues) - Report bugs or request features  
+          - [🔀 Pull Requests](../../pulls) - Review and merge changes
+          - [🔒 Security](../../security) - Security advisories and policies
+          - [📈 Insights](../../pulse) - Repository activity and statistics
+          
+          ## 🚀 Getting Started
+          
+          1. **Clone the repository**
+             \`\`\`bash
+             git clone https://github.com/${{ github.repository }}.git
+             \`\`\`
+          
+          2. **Explore the workflows**
+             - Check \`.github/workflows/\` for CI/CD configurations
+             - Review workflow documentation for usage instructions
+          
+          3. **Contribute**
+             - Follow the contributing guidelines
+             - Ensure all CI checks pass
+             - Submit pull requests for review
+          
+          ---
+          
+          <div align="center">
+            <sub>
+              🤖 <strong>Dashboard automatically updated on ${LAST_UPDATED}</strong><br>
+              Generated by <a href="https://github.com/Stratovate-Solutions">Stratovate Solutions</a> Repository Health Monitor
+            </sub>
+          </div>
+          
+          <!-- REPOSITORY_HEALTH_DASHBOARD_END -->
+          EOF
+          
+          echo "Dashboard content generated successfully"
+
+      - name: 📝 Update README.md
+        run: |
+          echo "Updating README.md with dashboard content..."
+          
+          # Check if README.md exists
+          if [ ! -f "README.md" ]; then
+            echo "Creating new README.md file..."
+            cp repository-dashboard.md README.md
+          else
+            echo "Updating existing README.md file..."
+            
+            # Check if dashboard section exists
+            if grep -q "REPOSITORY_HEALTH_DASHBOARD_START" README.md; then
+              echo "Replacing existing dashboard section..."
+              
+              # Use awk to replace the dashboard section
+              awk '
+                /REPOSITORY_HEALTH_DASHBOARD_START/ {
+                  print
+                  while ((getline line < "repository-dashboard.md") > 0) {
+                    if (line ~ /REPOSITORY_HEALTH_DASHBOARD_START/) continue
+                    print line
+                  }
+                  close("repository-dashboard.md")
+                  skip = 1
+                  next
+                }
+                /REPOSITORY_HEALTH_DASHBOARD_END/ {
+                  skip = 0
+                  next
+                }
+                !skip
+              ' README.md > README_updated.md
+              
+              mv README_updated.md README.md
+            else
+              echo "Adding dashboard section to README.md..."
+              # Add dashboard at the beginning of README
+              cat repository-dashboard.md README.md > README_new.md
+              mv README_new.md README.md
+            fi
+          fi
+          
+          echo "README.md updated successfully"
+
+      - name: 🔍 Check for Changes
+        id: changes
+        run: |
+          # Check if there are any changes to commit
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "Changes detected in repository files"
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "No changes detected"
+          fi
+
+      - name: 💾 Commit Dashboard Updates
+        if: steps.changes.outputs.changes == 'true' || github.event.inputs.force-update == 'true'
+        run: |
+          echo "Committing dashboard updates..."
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add README.md
+          git commit -m "📊 Update repository health dashboard
+          
+          - Updated workflow status badges
+          - Refreshed repository metrics
+          - Updated health indicators
+          - Generated on $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          
+          Co-authored-by: Repository Health Monitor <noreply@stratovate.com>"
+          
+          git push
+          
+          echo "Dashboard updates committed and pushed successfully"
+
+      - name: 📤 Upload Dashboard Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-dashboard
+          path: |
+            repository-dashboard.md
+            metrics.json
+          retention-days: 30

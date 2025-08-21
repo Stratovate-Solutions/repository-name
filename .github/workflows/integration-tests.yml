@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [main, master]
 
+# Concurrency control to prevent multiple runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   test-issue-templates:
     name: Test Issue Templates

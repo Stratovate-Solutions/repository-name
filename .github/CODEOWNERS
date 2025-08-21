@@ -1,0 +1,31 @@
+# Global code owners for the organization
+# This file defines who should review changes to different parts of the codebase
+
+# Default owners for everything in the repository
+* @Stratovate-Solutions/maintainers
+
+# GitHub-specific files
+/.github/ @Stratovate-Solutions/devops-team
+/.github/workflows/ @Stratovate-Solutions/devops-team
+
+# Documentation
+*.md @Stratovate-Solutions/documentation-team
+/docs/ @Stratovate-Solutions/documentation-team
+
+# Security-related files
+/security/ @Stratovate-Solutions/security-team
+SECURITY.md @Stratovate-Solutions/security-team
+
+# PowerShell files
+*.ps1 @Stratovate-Solutions/powershell-team
+*.psm1 @Stratovate-Solutions/powershell-team
+*.psd1 @Stratovate-Solutions/powershell-team
+
+# Configuration files
+*.yml @Stratovate-Solutions/devops-team
+*.yaml @Stratovate-Solutions/devops-team
+*.json @Stratovate-Solutions/devops-team
+
+# License and legal files
+LICENSE* @Stratovate-Solutions/legal-team
+CHANGELOG.md @Stratovate-Solutions/maintainers

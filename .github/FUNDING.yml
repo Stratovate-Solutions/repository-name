@@ -1,0 +1,19 @@
+# Funding configuration for the organization
+# This file configures funding options for repositories in the organization
+
+# GitHub Sponsors
+github: [Stratovate-Solutions]
+
+# Other funding platforms
+# patreon: username
+# open_collective: username
+# ko_fi: username
+# tidelift: npm-package-name
+# community_bridge: project-name
+# liberapay: username
+# issuehunt: username
+# otechie: username
+# lfx_crowdfunding: project-name
+
+# Custom funding URLs
+custom: ["https://stratovate-solutions.com/support"]

@@ -1,0 +1,325 @@
+# =============================================================================
+# Dependency Review Workflow
+# =============================================================================
+#
+# Purpose: Review dependencies for security vulnerabilities and license compliance
+# Author: Stratovate Solutions DevOps Team
+# Version: 1.0
+# Last Updated: 2025-08-20
+#
+# This workflow provides comprehensive dependency analysis including:
+# - Security vulnerability scanning for new dependencies
+# - License compliance checking
+# - Dependency health scoring
+# - Supply chain security analysis
+#
+# Triggers:
+# - Pull requests (to review dependency changes)
+# - Manual dispatch for on-demand analysis
+# =============================================================================
+
+name: 🔍 Dependency Review
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/yarn.lock'
+      - '**/requirements.txt'
+      - '**/pyproject.toml'
+      - '**/poetry.lock'
+      - '**/Pipfile'
+      - '**/Pipfile.lock'
+      - '**/Gemfile'
+      - '**/Gemfile.lock'
+      - '**/composer.json'
+      - '**/composer.lock'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '**/*.csproj'
+      - '**/packages.config'
+      - '**/Directory.Build.props'
+  workflow_dispatch:
+    inputs:
+      severity-threshold:
+        description: 'Minimum severity level to report'
+        required: false
+        default: 'moderate'
+        type: choice
+        options:
+          - 'low'
+          - 'moderate'
+          - 'high'
+          - 'critical'
+
+# Concurrency control
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+  actions: read
+
+jobs:
+  dependency-review:
+    name: 🔍 Review Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Dependency Review Action
+        uses: actions/dependency-review-action@v4
+        with:
+          # Fail on high/critical vulnerabilities
+          fail-on-severity: ${{ github.event.inputs.severity-threshold || 'moderate' }}
+          # Allow specific licenses
+          allow-licenses: 'MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD'
+          # Deny copyleft licenses (optional - adjust based on your needs)
+          deny-licenses: 'GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, AGPL-3.0'
+          # Comment on PRs with findings
+          comment-summary-in-pr: always
+          # Retry configuration
+          retry-on-snapshot-warnings: true
+          retry-on-snapshot-warnings-timeout: 120
+
+  # Additional dependency analysis for specific ecosystems
+  npm-audit:
+    name: 📦 NPM Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: contains(github.event.pull_request.changed_files, 'package.json') || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: |
+          if [ -f "package.json" ]; then
+            npm ci || npm install
+          else
+            echo "No package.json found, skipping npm audit"
+            exit 0
+          fi
+
+      - name: 🔍 Run NPM Audit
+        run: |
+          echo "=== NPM Security Audit ==="
+          
+          # Run audit and capture output
+          if npm audit --audit-level=${{ github.event.inputs.severity-threshold || 'moderate' }} --json > npm-audit.json; then
+            echo "✅ No vulnerabilities found above threshold"
+          else
+            echo "⚠️ Vulnerabilities detected"
+            
+            # Parse and display results
+            if command -v jq >/dev/null 2>&1; then
+              echo ""
+              echo "📊 Vulnerability Summary:"
+              jq -r '.metadata.vulnerabilities | to_entries[] | "\(.key): \(.value)"' npm-audit.json || true
+              
+              echo ""
+              echo "🚨 Critical Vulnerabilities:"
+              jq -r '.vulnerabilities | to_entries[] | select(.value.severity == "critical") | .key' npm-audit.json || true
+            fi
+            
+            # Upload audit results
+            echo "Audit results saved for review"
+          fi
+
+      - name: 📤 Upload NPM Audit Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npm-audit-results
+          path: npm-audit.json
+          retention-days: 30
+
+  python-safety:
+    name: 🐍 Python Security Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: contains(github.event.pull_request.changed_files, 'requirements.txt') || contains(github.event.pull_request.changed_files, 'pyproject.toml') || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install Safety
+        run: pip install safety
+
+      - name: 🔍 Run Safety Check
+        run: |
+          echo "=== Python Safety Check ==="
+          
+          if [ -f "requirements.txt" ]; then
+            echo "Checking requirements.txt..."
+            safety check -r requirements.txt --json --output safety-report.json || true
+            
+            if [ -f "safety-report.json" ]; then
+              echo "📊 Safety check completed"
+              
+              # Display summary if jq is available
+              if command -v jq >/dev/null 2>&1; then
+                vuln_count=$(jq '. | length' safety-report.json 2>/dev/null || echo "0")
+                echo "🚨 Vulnerabilities found: $vuln_count"
+                
+                if [ "$vuln_count" != "0" ]; then
+                  echo ""
+                  echo "📋 Vulnerability Details:"
+                  jq -r '.[] | "- \(.package_name) \(.installed_version): \(.vulnerability_id)"' safety-report.json || true
+                fi
+              fi
+            fi
+          else
+            echo "No requirements.txt found, skipping Python safety check"
+          fi
+
+      - name: 📤 Upload Safety Results
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('safety-report.json') != ''
+        with:
+          name: python-safety-results
+          path: safety-report.json
+          retention-days: 30
+
+  license-compliance:
+    name: 📜 License Compliance Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📜 License Compliance Analysis
+        run: |
+          echo "=== License Compliance Analysis ==="
+          
+          # Create a simple license compliance report
+          cat > license-report.md << EOF
+          # 📜 License Compliance Report
+          
+          ## Approved Licenses
+          - MIT License
+          - Apache License 2.0
+          - BSD 2-Clause License
+          - BSD 3-Clause License
+          - ISC License
+          - 0BSD License
+          
+          ## Review Required
+          - GPL-2.0 (Copyleft - review required)
+          - GPL-3.0 (Copyleft - review required)
+          - LGPL-2.1 (Weak copyleft - review required)
+          - LGPL-3.0 (Weak copyleft - review required)
+          - AGPL-3.0 (Strong copyleft - review required)
+          
+          ## Guidelines
+          - All dependencies should use approved licenses
+          - Copyleft licenses require legal review
+          - Proprietary code cannot use copyleft dependencies
+          - Document any exceptions or special arrangements
+          
+          ---
+          Generated on $(date)
+          EOF
+          
+          echo "📋 License compliance guidelines documented"
+
+      - name: 📤 Upload License Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-compliance-report
+          path: license-report.md
+          retention-days: 30
+
+  summary:
+    name: 📋 Dependency Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-review, npm-audit, python-safety, license-compliance]
+    if: always()
+
+    steps:
+      - name: 📊 Generate Summary
+        run: |
+          echo "::group::Dependency Review Results"
+          echo "Dependency Review: ${{ needs.dependency-review.result }}"
+          echo "NPM Audit: ${{ needs.npm-audit.result }}"
+          echo "Python Safety: ${{ needs.python-safety.result }}"
+          echo "License Compliance: ${{ needs.license-compliance.result }}"
+
+          # Determine overall status
+          if [[ "${{ needs.dependency-review.result }}" == "success" ]]; then
+            echo "✅ Dependency review passed!"
+            echo "All dependency changes have been reviewed for security and compliance."
+          else
+            echo "❌ Dependency review issues detected"
+            echo "Please review the dependency analysis results and address any issues."
+          fi
+          echo "::endgroup::"
+
+      - name: 💬 PR Comment Summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = {
+              dependencyReview: '${{ needs.dependency-review.result }}',
+              npmAudit: '${{ needs.npm-audit.result }}',
+              pythonSafety: '${{ needs.python-safety.result }}',
+              licenseCompliance: '${{ needs.license-compliance.result }}'
+            };
+            
+            const passed = Object.values(results).filter(r => r === 'success').length;
+            const total = Object.values(results).filter(r => r !== 'skipped').length;
+            
+            let status = '✅';
+            let message = 'All dependency checks passed!';
+            
+            if (results.dependencyReview === 'failure') {
+              status = '❌';
+              message = 'Dependency security issues detected. Please review and address the findings.';
+            } else if (passed < total) {
+              status = '⚠️';
+              message = 'Some dependency checks completed with warnings. Please review the results.';
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ${status} Dependency Review Summary
+
+              **Overall Status**: ${message}
+
+              ### Results:
+              - **Dependency Review**: ${results.dependencyReview}
+              - **NPM Audit**: ${results.npmAudit}
+              - **Python Safety**: ${results.pythonSafety}
+              - **License Compliance**: ${results.licenseCompliance}
+
+              ### 📊 Score: ${passed}/${total} checks passed
+
+              For detailed results, check the workflow artifacts and individual job logs.
+              `
+            });

@@ -2,10 +2,10 @@
 # Continuous Integration Workflow
 # =============================================================================
 #
-# Purpose: Automated CI/CD pipeline for code quality, testing, and security
+# Purpose: Comprehensive CI/CD pipeline for code quality, testing, and security
 # Author: Stratovate Solutions DevOps Team
-# Version: 2.0
-# Last Updated: 2025-08-19
+# Version: 2.1
+# Last Updated: 2025-08-20
 #
 # This workflow provides comprehensive continuous integration including:
 # - Multi-language project detection and building
@@ -35,7 +35,7 @@
 # - Monitor build artifacts in workflow runs
 # =============================================================================
 
-name: Continuous Integration
+name: CI/CD Pipeline
 
 # =============================================================================
 # Workflow Triggers
@@ -88,6 +88,11 @@ on:
 # Global Workflow Configuration
 # =============================================================================
 
+# Concurrency control to prevent multiple runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Set default permissions for GITHUB_TOKEN (principle of least privilege)
 permissions:
   contents: read          # Read repository contents
@@ -100,7 +105,7 @@ permissions:
 # Global environment variables
 env:
   # Workflow metadata
-  WORKFLOW_VERSION: "2.0"
+  WORKFLOW_VERSION: "2.1"
   ORGANIZATION: "Stratovate-Solutions"
 
   # Build configuration
@@ -114,37 +119,69 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Job 1: Continuous Integration
+  # Job 1: Linting and Validation
   # ---------------------------------------------------------------------------
-  #
-  # Responsibilities:
-  # - Auto-detect project type (Node.js, Python, .NET, PowerShell)
-  # - Install dependencies and build project
-  # - Run linting and code quality checks
-  # - Execute unit and integration tests
-  # - Generate code coverage reports
-  # - Cache dependencies for faster subsequent runs
-  #
-  # Supported Project Types:
-  # - Node.js (package.json detected)
-  # - Python (requirements.txt, pyproject.toml)
-  # - .NET (*.csproj, *.sln files)
-  # - PowerShell (*.ps1, *.psm1 files)
-  # - Generic (fallback for other project types)
-  # ---------------------------------------------------------------------------
+  lint:
+    name: 🔍 Lint & Validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
-  ci:
-    name: Build & Test
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📝 Lint YAML Files
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          config_file: .yamllint
+
+      - name: 📄 Lint Markdown Files
+        uses: DavidAnson/markdownlint-cli2-action@v14
+        with:
+          globs: '**/*.md'
+
+      - name: 🔧 Validate GitHub Configuration
+        shell: bash
+        run: |
+          echo "=== GitHub Configuration Validation ==="
+          
+          # Find all workflow files
+          workflow_files=$(find .github/workflows -name "*.yml" -o -name "*.yaml" 2>/dev/null || true)
+          
+          if [ -z "$workflow_files" ]; then
+            echo "⚠️ No workflow files found in .github/workflows"
+          else
+            echo "✅ Found workflow files:"
+            echo "$workflow_files" | while read -r file; do
+              echo "  - $file"
+            done
+          fi
+          
+          # Check for required files
+          required_files=(".github/workflows" "README.md")
+          for file in "${required_files[@]}"; do
+            if [ -e "$file" ]; then
+              echo "✅ Found: $file"
+            else
+              echo "⚠️ Missing: $file"
+            fi
+          done
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Build and Test
+  # ---------------------------------------------------------------------------
+  build-test:
+    name: 🏗️ Build & Test
     # Skip CI on draft PRs (optional optimization)
     if: github.event.pull_request.draft != true
     runs-on: windows-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout Repository
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Analyze Project Structure
+      - name: 🔍 Analyze Project Structure
         shell: pwsh
         run: |
           Write-Host "=== Project Analysis ===" -ForegroundColor Cyan
@@ -166,7 +203,7 @@ jobs:
           }
           Write-Host "  Total PowerShell files: $($psFiles.Count)" -ForegroundColor Green
 
-      - name: Setup PowerShell Environment
+      - name: ⚙️ Setup PowerShell Environment
         shell: pwsh
         run: |
           Write-Host "=== PowerShell Environment Setup ===" -ForegroundColor Cyan
@@ -178,7 +215,7 @@ jobs:
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
           Write-Host "Execution policy set to RemoteSigned" -ForegroundColor Green
 
-      - name: Install Required Modules
+      - name: 📦 Install Required Modules
         shell: pwsh
         run: |
           Write-Host "=== Installing PowerShell Modules ===" -ForegroundColor Cyan
@@ -200,7 +237,7 @@ jobs:
           Write-Host "Installed Modules:" -ForegroundColor Yellow
           Get-Module -ListAvailable PSScriptAnalyzer, Pester | Format-Table Name, Version -AutoSize
 
-      - name: Run PSScriptAnalyzer
+      - name: 🔍 Run PSScriptAnalyzer
         shell: pwsh
         run: |
           Write-Host "=== PSScriptAnalyzer Code Quality Check ===" -ForegroundColor Cyan
@@ -242,7 +279,7 @@ jobs:
             Write-Host "PSScriptAnalyzer found no issues!" -ForegroundColor Green
           }
 
-      - name: Run Pester Tests
+      - name: 🧪 Run Pester Tests
         if: github.event.inputs.skip-tests != 'true'
         shell: pwsh
         run: |
@@ -307,7 +344,15 @@ jobs:
             }
           }
 
-      - name: Generate Build Report
+      - name: 📊 Publish Test Results
+        uses: dorny/test-reporter@v1
+        if: always() && hashFiles('TestResults.xml') != ''
+        with:
+          name: PowerShell Tests
+          path: TestResults.xml
+          reporter: java-junit
+
+      - name: 📈 Generate Build Report
         if: always()
         shell: pwsh
         run: |
@@ -369,7 +414,7 @@ jobs:
           Write-Host "Build Report:" -ForegroundColor Yellow
           Write-Host $reportContent -ForegroundColor White
 
-      - name: Upload Build Artifacts
+      - name: 📦 Upload Build Artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -383,25 +428,10 @@ jobs:
           retention-days: 30
 
   # ---------------------------------------------------------------------------
-  # Job 2: Security Scanning
+  # Job 3: Security Scanning
   # ---------------------------------------------------------------------------
-  #
-  # Responsibilities:
-  # - Scan for known vulnerabilities in dependencies
-  # - Static Application Security Testing (SAST)
-  # - Secret scanning for exposed credentials
-  # - License compliance checking
-  # - Generate security reports and alerts
-  #
-  # Security Tools Included:
-  # - GitHub Advanced Security (CodeQL)
-  # - Dependency vulnerability scanning
-  # - Container image scanning (if applicable)
-  # - Infrastructure as Code security analysis
-  # ---------------------------------------------------------------------------
-
   security:
-    name: Security Scan
+    name: 🛡️ Security Scan
     # Run security scans in parallel with CI for faster feedback
     if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
@@ -413,13 +443,28 @@ jobs:
       actions: read
 
     steps:
-      - name: Checkout Repository
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
         with:
           # Fetch full history for comprehensive secret scanning
           fetch-depth: 0
 
-      - name: PowerShell Security Analysis
+      - name: 🔍 CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          config: |
+            paths-ignore:
+              - "**/*.md"
+              - "**/docs/**"
+
+      - name: 🏗️ CodeQL Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: 📊 CodeQL Results
+        uses: github/codeql-action/analyze@v3
+
+      - name: 🛡️ PowerShell Security Analysis
         shell: pwsh
         run: |
           Write-Host "Running PowerShell security analysis..." -ForegroundColor Yellow
@@ -451,7 +496,7 @@ jobs:
           
           Write-Host "PowerShell security analysis completed" -ForegroundColor Green
 
-      - name: Basic Dependency Scan
+      - name: 🔍 Basic Dependency Scan
         run: |
           echo "Basic dependency scanning..."
           
@@ -470,7 +515,7 @@ jobs:
           
           echo "Basic dependency scan completed"
 
-      - name: Secret Scanning
+      - name: 🔑 Basic Secret Scanning
         run: |
           echo "Basic secret scanning..."
           
@@ -498,44 +543,37 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
-  # Job 3: Build Validation Summary
+  # Job 4: Build Validation Summary
   # ---------------------------------------------------------------------------
-  #
-  # Responsibilities:
-  # - Wait for all previous jobs to complete
-  # - Provide overall pipeline status
-  # - Generate build summary and notifications
-  # - Set final PR check status
-  # ---------------------------------------------------------------------------
-
   build-summary:
-    name: Build Summary
+    name: 📋 Build Summary
     runs-on: ubuntu-latest
-    needs: [ci, security]
+    needs: [lint, build-test, security]
     if: always()  # Run even if previous jobs fail
 
     steps:
-      - name: Pipeline Summary
+      - name: 📊 Pipeline Summary
         run: |
           echo "::group::Pipeline Results"
-          echo "CI Status: ${{ needs.ci.result }}"
+          echo "Lint Status: ${{ needs.lint.result }}"
+          echo "Build & Test Status: ${{ needs.build-test.result }}"
           echo "Security Status: ${{ needs.security.result }}"
 
           # Determine overall status
-          if [[ "${{ needs.ci.result }}" == "success" && "${{ needs.security.result }}" == "success" ]]; then
-            echo "[OK] Pipeline Status: SUCCESS"
+          if [[ "${{ needs.lint.result }}" == "success" && "${{ needs.build-test.result }}" == "success" && "${{ needs.security.result }}" == "success" ]]; then
+            echo "✅ Pipeline Status: SUCCESS"
             echo "All checks passed! Ready for review/merge."
-          elif [[ "${{ needs.ci.result }}" == "failure" || "${{ needs.security.result }}" == "failure" ]]; then
-            echo "[ERROR] Pipeline Status: FAILURE"
+          elif [[ "${{ needs.lint.result }}" == "failure" || "${{ needs.build-test.result }}" == "failure" || "${{ needs.security.result }}" == "failure" ]]; then
+            echo "❌ Pipeline Status: FAILURE"
             echo "One or more checks failed. Please review the logs."
             exit 1
           else
-            echo "[Warning] Pipeline Status: PARTIAL"
+            echo "⚠️ Pipeline Status: PARTIAL"
             echo "Some checks were skipped or cancelled."
           fi
           echo "::endgroup::"
 
-      - name: PR Comment (on failure)
+      - name: 💬 PR Comment (on failure)
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
@@ -548,7 +586,8 @@ jobs:
 
               The continuous integration pipeline has failed. Please check the following:
 
-              - **CI Build**: ${{ needs.ci.result }}
+              - **Lint & Validate**: ${{ needs.lint.result }}
+              - **Build & Test**: ${{ needs.build-test.result }}
               - **Security Scan**: ${{ needs.security.result }}
 
               ### Next Steps:

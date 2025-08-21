@@ -1,0 +1,73 @@
+# Repository Settings Template
+# This file can be used with the Probot Settings app to configure repository settings
+
+repository:
+  # Repository metadata
+  name: repository-name
+  description: "Repository description"
+  homepage: "https://stratovate-solutions.com"
+  topics:
+    - stratovate-solutions
+    - powershell
+    - automation
+    - devops
+
+  # Repository options
+  private: false
+  has_issues: true
+  has_projects: true
+  has_wiki: false
+  has_downloads: true
+  default_branch: main
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: true
+  delete_branch_on_merge: true
+  enable_automated_security_fixes: true
+  enable_vulnerability_alerts: true
+
+# Branch protection rules
+branches:
+  - name: main
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - "CI/CD Pipeline"
+          - "Lint & Validate"
+          - "Security Scan"
+      enforce_admins: true
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+        dismissal_restrictions:
+          users: []
+          teams:
+            - maintainers
+      restrictions:
+        users: []
+        teams:
+          - maintainers
+
+  - name: develop
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - "CI/CD Pipeline"
+          - "Lint & Validate"
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: false
+
+# Teams (for organization repositories)
+teams:
+  - name: maintainers
+    permission: admin
+  - name: developers
+    permission: push
+  - name: contributors
+    permission: pull
