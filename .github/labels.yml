@@ -1,113 +1,113 @@
 # Repository Labels Configuration
 # This file defines the standard labels for all repositories in the organization
+# Format: Direct array of label objects for EndBug/label-sync@v2 compatibility
 
-labels:
-  # Priority Labels
-  - name: "priority/critical"
-    color: "d73a4a"
-    description: "Critical priority - needs immediate attention"
+# Priority Labels
+- name: "priority/critical"
+  color: "d73a4a"
+  description: "Critical priority - needs immediate attention"
+
+- name: "priority/high"
+  color: "ff9f00"
+  description: "High priority - should be addressed soon"
   
-  - name: "priority/high"
-    color: "ff9f00"
-    description: "High priority - should be addressed soon"
-    
-  - name: "priority/medium"
-    color: "ffcc00"
-    description: "Medium priority - normal timeline"
-    
-  - name: "priority/low"
-    color: "cccccc"
-    description: "Low priority - can be delayed"
+- name: "priority/medium"
+  color: "ffcc00"
+  description: "Medium priority - normal timeline"
+  
+- name: "priority/low"
+  color: "cccccc"
+  description: "Low priority - can be delayed"
 
-  # Type Labels
-  - name: "type/bug"
-    color: "d73a4a"
-    description: "Something isn't working"
-    
-  - name: "type/feature"
-    color: "a2eeef"
-    description: "New feature or request"
-    
-  - name: "type/enhancement"
-    color: "0075ca"
-    description: "Improvement to existing functionality"
-    
-  - name: "type/documentation"
-    color: "0075ca"
-    description: "Improvements or additions to documentation"
-    
-  - name: "type/security"
-    color: "ff0000"
-    description: "Security-related issue or improvement"
+# Type Labels
+- name: "type/bug"
+  color: "d73a4a"
+  description: "Something isn't working"
+  
+- name: "type/feature"
+  color: "a2eeef"
+  description: "New feature or request"
+  
+- name: "type/enhancement"
+  color: "0075ca"
+  description: "Improvement to existing functionality"
+  
+- name: "type/documentation"
+  color: "0075ca"
+  description: "Improvements or additions to documentation"
+  
+- name: "type/security"
+  color: "ff0000"
+  description: "Security-related issue or improvement"
 
-  # Status Labels
-  - name: "status/needs-review"
-    color: "fbca04"
-    description: "Needs code review"
-    
-  - name: "status/needs-testing"
-    color: "ff9f00"
-    description: "Needs testing before merge"
-    
-  - name: "status/blocked"
-    color: "d73a4a"
-    description: "Blocked by external dependency"
-    
-  - name: "status/wip"
-    color: "ffcc00"
-    description: "Work in progress"
+# Status Labels
+- name: "status/needs-review"
+  color: "fbca04"
+  description: "Needs code review"
+  
+- name: "status/needs-testing"
+  color: "ff9f00"
+  description: "Needs testing before merge"
+  
+- name: "status/blocked"
+  color: "d73a4a"
+  description: "Blocked by external dependency"
+  
+- name: "status/wip"
+  color: "ffcc00"
+  description: "Work in progress"
 
-  # Component Labels
-  - name: "component/ci-cd"
-    color: "1d76db"
-    description: "Related to CI/CD pipelines"
-    
-  - name: "component/security"
-    color: "ff0000"
-    description: "Related to security features"
-    
-  - name: "component/documentation"
-    color: "0075ca"
-    description: "Related to documentation"
-    
-  - name: "component/testing"
-    color: "0e8a16"
-    description: "Related to testing"
+# Component Labels
+- name: "component/ci-cd"
+  color: "1d76db"
+  description: "Related to CI/CD pipelines"
+  
+- name: "component/security"
+  color: "ff0000"
+  description: "Related to security features"
+  
+- name: "component/documentation"
+  color: "0075ca"
+  description: "Related to documentation"
+  
+- name: "component/testing"
+  color: "0e8a16"
+  description: "Related to testing"
 
-  # Size Labels
-  - name: "size/xs"
-    color: "3cbf00"
-    description: "Extra small change"
-    
-  - name: "size/s"
-    color: "5cbf00"
-    description: "Small change"
-    
-  - name: "size/m"
-    color: "ffcc00"
-    description: "Medium change"
-    
-  - name: "size/l"
-    color: "ff9f00"
-    description: "Large change"
-    
-  - name: "size/xl"
-    color: "d73a4a"
-    description: "Extra large change"
+# Size Labels
+- name: "size/xs"
+  color: "3cbf00"
+  description: "Extra small change"
+  
+- name: "size/s"
+  color: "5cbf00"
+  description: "Small change"
+  
+- name: "size/m"
+  color: "ffcc00"
+  description: "Medium change"
+  
+- name: "size/l"
+  color: "ff9f00"
+  description: "Large change"
+  
+- name: "size/xl"
+  color: "d73a4a"
+  description: "Extra large change"
 
-  # Special Labels
-  - name: "good first issue"
-    color: "7057ff"
-    description: "Good for newcomers"
-    
-  - name: "help wanted"
-    color: "008672"
-    description: "Extra attention is needed"
-    
-  - name: "dependencies"
-    color: "0366d6"
-    description: "Pull requests that update a dependency file"
-    
-  - name: "breaking-change"
-    color: "d73a4a"
-    description: "Introduces breaking changes"
+# Special Labels
+- name: "good first issue"
+  color: "7057ff"
+  description: "Good for newcomers"
+  
+- name: "help wanted"
+  color: "008672"
+  description: "Extra attention is needed"
+  
+- name: "dependencies"
+  color: "0366d6"
+  description: "Pull requests that update a dependency file"
+  
+- name: "breaking-change"
+  color: "d73a4a"
+  description: "Introduces breaking changes"
